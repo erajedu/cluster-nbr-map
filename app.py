@@ -226,7 +226,7 @@ input[type="color"]{width:32px;height:24px;border:1px solid #334155;border-radiu
 .cfg-content input[type=text]{width:100%;padding:5px 7px;background:#0a0e1a;border:1px solid #334155;border-radius:3px;color:#e2e8f0;font-size:11px;box-sizing:border-box;margin:4px 0}
 </style></head><body>
 <div id="app">
-<div id="hdr"><span>Cluster Neighbor Visualization Tool</span><span class="sub">@Rajesh Dubey | rajesh.dubey@sds.com</span></div>
+<div id="hdr"><span>Cluster Neighbor Visualization Tool</span><span class="sub">@Rajesh Dubey | rajesh.dubey@ericsson.com</span></div>
 <div id="wrap">
 <div id="side">
 
