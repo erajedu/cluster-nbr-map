@@ -5,58 +5,57 @@ import math
 import json
 import streamlit.components.v1 as components
 
-st.set_page_config(
-    layout="wide",
-    page_title="Cluster NBR Map",
-    page_icon="🗺️",
-    initial_sidebar_state="collapsed"
-)
+st.set_page_config(layout="wide", page_title="Cluster NBR Map", initial_sidebar_state="collapsed")
 
-# ───────────────────────── CSS ─────────────────────────
+# ─ Hide Streamlit chrome completely ──
 st.markdown("""
 <style>
-    /* Reset Streamlit defaults */
     .block-container { padding: 0 !important; max-width: 100% !important; }
     .stApp { background: #0a0e1a !important; }
-    #MainMenu, footer, .stDecoration, header[data-testid="stHeader"] { visibility: hidden !important; display: none !important; }
-    .element-container { margin-bottom: 0 !important; }
-    div[data-testid="stVerticalBlock"] > div { margin-bottom: 0 !important; }
-    div[data-testid="stVerticalBlock"] { gap: 0 !important; }
-    .stColumn { padding: 0 2px !important; }
-    
-    /* File uploader styling */
+    #MainMenu, footer, .stDecoration, header[data-testid="stHeader"] { display: none !important; }
     .stFileUploader { margin: 0 !important; padding: 0 !important; }
     .stFileUploader > div { background: transparent !important; border: none !important; padding: 0 !important; }
     .stFileUploader label { display: none !important; }
-    .stFileUploader [data-testid="stFileUploaderDropzone"] { 
-        min-height: 26px !important; padding: 2px 10px !important;
-        background: #1a1f2e !important; border: 1px solid #2a3142 !important;
-        border-radius: 4px !important; cursor: pointer !important;
+    .stFileUploader [data-testid="stFileUploaderDropzone"] {
+        min-height: 30px !important; padding: 3px 8px !important;
+        background: rgba(255,255,255,0.05) !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        border-radius: 3px !important;
     }
-    .stFileUploader [data-testid="stFileUploaderDropzone"]:hover { background: #252b3d !important; }
-    .stFileUploader [data-testid="stFileUploaderDropzone"] p { color: #c8cdd8 !important; font-size: 11px !important; margin: 0 !important; font-weight: 500 !important; }
+    .stFileUploader [data-testid="stFileUploaderDropzone"] p {
+        color: #94a3b8 !important; font-size: 11px !important; margin: 0 !important;
+    }
     .stFileUploader [data-testid="stFileUploaderInstruction"],
     .stFileUploader [data-testid="stFileUploaderDropzoneInstructions"] { display: none !important; }
-    
-    /* Map wrapper */
-    .map-wrapper { height: calc(100vh - 72px); width: 100%; overflow: hidden; }
-    
-    /* Hide spinner border */
-    .stSpinner > div { border-color: #6366f1 !important; }
+    .stColumn { padding: 0 2px !important; }
+    .element-container { margin-bottom: 0 !important; }
+    div[data-testid="stVerticalBlock"] > div { margin-bottom: 0 !important; }
+    div[data-testid="stVerticalBlock"] { gap: 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ───────────────────────── CONFIG & HELPERS ─────────────────────────
-MAX_DISTANCE_MILES = 25.0
-BUFFER_MILES = 1.8
-CLOSEST_N = 15
-ZERO_HO_IS_MISSING = False
-WEDGE_RADIUS_M = 400
+# ── Compact upload bar ──
+site_file = None
+nbr_file = None
 
-USID_COL, SITE_NAME_COL, LAT_COL, LON_COL = "USID", "ENODEB_New", "LATITUDE", "LONGITUDE"
-AZIMUTH_COL, CELL_COL = "AZIMUTH", "CELL"
-NBR_SRC_COL, NBR_COL, CLUSTER_NAME_COL = "USID", "ClusterUSID", "ClusterName"
-HO_COL, PCT_COL = "HO ATT", "% Sharing"
+st.markdown('<div style="background:#0d1220;border-bottom:1px solid #1e293b;padding:6px 12px;display:flex;align-items:center;gap:8px;height:42px;box-sizing:border-box">', unsafe_allow_html=True)
+c1, c2, c3 = st.columns([0.42, 0.42, 0.16], gap="small")
+with c1:
+    st.markdown('<span style="color:#64748b;font-size:11px"> Site Data:</span>', unsafe_allow_html=True)
+    site_file = st.file_uploader("", type=["csv"], key="site", label_visibility="collapsed")
+with c2:
+    st.markdown('<span style="color:#64748b;font-size:11px">📊 SQL Table:</span>', unsafe_allow_html=True)
+    nbr_file = st.file_uploader("", type=["xlsx", "xls", "csv"], key="nbr", label_visibility="collapsed")
+with c3:
+    status = "✓ Both files loaded" if (site_file and nbr_file) else "Upload files above"
+    color = "#10b981" if (site_file and nbr_file) else "#64748b"
+    st.markdown(f'<div style="color:{color};font-size:11px;text-align:right">{status}</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
+
+# ─ Config & Helpers ──
+MAX_DISTANCE_MILES, BUFFER_MILES, CLOSEST_N, ZERO_HO_IS_MISSING, WEDGE_RADIUS_M = 25.0, 1.8, 15, False, 400
+USID_COL, SITE_NAME_COL, LAT_COL, LON_COL, AZIMUTH_COL, CELL_COL = "USID", "ENODEB_New", "LATITUDE", "LONGITUDE", "AZIMUTH", "CELL"
+NBR_SRC_COL, NBR_COL, CLUSTER_NAME_COL, HO_COL, PCT_COL = "USID", "ClusterUSID", "ClusterName", "HO ATT", "% Sharing"
 
 def norm_id(x):
     s = str(x).strip().upper()
@@ -69,16 +68,13 @@ def num(v):
 def load_sites(df):
     df = df.dropna(subset=[USID_COL])
     df[USID_COL] = df[USID_COL].map(norm_id)
-    for c in (LAT_COL, LON_COL, AZIMUTH_COL):
-        df[c] = pd.to_numeric(df[c], errors="coerce")
+    for c in (LAT_COL, LON_COL, AZIMUTH_COL): df[c] = pd.to_numeric(df[c], errors="coerce")
     df = df.dropna(subset=[LAT_COL, LON_COL])
     if SITE_NAME_COL in df.columns:
         names = df[SITE_NAME_COL].where(df[SITE_NAME_COL].notna(), df[USID_COL]).astype(str).str.strip()
         df["_name"] = names.where(names != "", df[USID_COL])
-    else:
-        df["_name"] = df[USID_COL]
-    sites = df.groupby(USID_COL, sort=False).agg(lat=(LAT_COL, "first"), lon=(LON_COL, "first"), name=("_name", "first"))
-    return df, sites
+    else: df["_name"] = df[USID_COL]
+    return df, df.groupby(USID_COL, sort=False).agg(lat=(LAT_COL,"first"), lon=(LON_COL,"first"), name=("_name","first"))
 
 def load_nbr_table(df):
     t = df.dropna(subset=[NBR_SRC_COL, NBR_COL])
@@ -104,280 +100,241 @@ def build_payload(df, tbl):
     sources = list(tbl[NBR_SRC_COL].unique())
     keep = select_sites(sites, tbl, sources)
     sub = df[df[USID_COL].isin(keep.index)]
-    cell_series = sub[CELL_COL] if CELL_COL in sub.columns else pd.Series([None] * len(sub), index=sub.index)
+    cell_series = sub[CELL_COL] if CELL_COL in sub.columns else pd.Series([None]*len(sub), index=sub.index)
     cells = {}
     for u, c, az in zip(sub[USID_COL], cell_series, sub[AZIMUTH_COL]):
         if pd.notna(az):
             label = str(c).strip() if pd.notna(c) and str(c).strip() else f"{u}_Sector"
             cells.setdefault(u, []).append([label, float(az)])
-    site_json = {u: [r.name, round(float(r.lat), 6), round(float(r.lon), 6), cells.get(u, [])]
-                 for u, r in zip(keep.index, keep.itertuples())}
+    site_json = {u: [r.name, round(float(r.lat),6), round(float(r.lon),6), cells.get(u,[])] for u, r in zip(keep.index, keep.itertuples())}
     has_ho, has_pct = HO_COL in tbl.columns, PCT_COL in tbl.columns
     nbr_json = {}
     for src, g in tbl.groupby(NBR_SRC_COL, sort=False):
         cname = str(g[CLUSTER_NAME_COL].dropna().iloc[0]).strip() if CLUSTER_NAME_COL in g.columns and g[CLUSTER_NAME_COL].notna().any() else ""
-        hos = g[HO_COL].map(num) if has_ho else [None] * len(g)
-        pcts = g[PCT_COL].map(num) if has_pct else [None] * len(g)
-        nbr_json[src] = [cname, [[n, h, p] for n, h, p in zip(g[NBR_COL], hos, pcts)]]
-    return {"cfg": {"buffer": BUFFER_MILES, "radiusM": WEDGE_RADIUS_M, "maxMiles": MAX_DISTANCE_MILES,
-                    "closestN": CLOSEST_N, "zeroHo": ZERO_HO_IS_MISSING, "default": None},
-            "sites": site_json, "nbr": nbr_json}
+        hos = g[HO_COL].map(num) if has_ho else [None]*len(g)
+        pcts = g[PCT_COL].map(num) if has_pct else [None]*len(g)
+        nbr_json[src] = [cname, [[n,h,p] for n,h,p in zip(g[NBR_COL], hos, pcts)]]
+    return {"cfg":{"buffer":BUFFER_MILES,"radiusM":WEDGE_RADIUS_M,"maxMiles":MAX_DISTANCE_MILES,"closestN":CLOSEST_N,"zeroHo":ZERO_HO_IS_MISSING,"default":None},"sites":site_json,"nbr":nbr_json}
 
-# ───────────────────────── STREAMLIT UI ─────────────────────────
-
-site_file = None
-nbr_file = None
-
-# Header bar (dark navy, white text)
-st.markdown("""
-<div style="background: #0a0e1a; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #1a1f2e;">
-    <div style="color: white; font-size: 22px; font-weight: 600; letter-spacing: -0.3px;">Cluster Neighbor Visualization Tool</div>
-    <div id="file-status" style="color: #10b981; font-size: 11px; font-weight: 500; display: none;">✓ Both files loaded</div>
-</div>
-""", unsafe_allow_html=True)
-
-# Upload bar (thin, dark)
-with st.container():
-    st.markdown('<div style="background: #0d1117; border-bottom: 1px solid #1a1f2e; padding: 6px 20px; display: flex; align-items: center; gap: 16px;">', unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([0.35, 0.35, 0.30], gap="small")
-    with col1:
-        st.markdown('<span style="color: #8b95a5; font-size: 11px; font-weight: 500; margin-right: 6px;">Site Data:</span>', unsafe_allow_html=True)
-        site_file = st.file_uploader("", type=["csv"], key="site", label_visibility="collapsed")
-    with col2:
-        st.markdown('<span style="color: #8b95a5; font-size: 11px; font-weight: 500; margin-right: 6px;">SQL Table:</span>', unsafe_allow_html=True)
-        nbr_file = st.file_uploader("", type=["xlsx", "xls", "csv"], key="nbr", label_visibility="collapsed")
-    with col3:
-        st.markdown('', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# JavaScript to show status when files loaded
+# ── Process & Render ──
 if site_file and nbr_file:
-    st.markdown("""
-    <script>
-    document.getElementById('file-status').style.display = 'block';
-    </script>
-    """, unsafe_allow_html=True)
+    try:
+        site_df = pd.read_csv(site_file, low_memory=False)
+        nbr_df = pd.read_csv(nbr_file, low_memory=False) if nbr_file.name.lower().endswith('.csv') else pd.read_excel(nbr_file)
+        payload = build_payload(site_df, nbr_df)
+        data = json.dumps(payload, ensure_ascii=False, separators=(",",":")).replace("</","<\\/")
 
-# Map container
-if site_file and nbr_file:
-    st.markdown('<div class="map-wrapper">', unsafe_allow_html=True)
-    
-    with st.spinner("Processing data..."):
-        try:
-            site_df = pd.read_csv(site_file, low_memory=False)
-            if nbr_file.name.lower().endswith('.csv'):
-                nbr_df = pd.read_csv(nbr_file, low_memory=False)
-            else:
-                nbr_df = pd.read_excel(nbr_file)
-            
-            payload = build_payload(site_df, nbr_df)
-            data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
-            
-            HTML = r"""<!DOCTYPE html>
+        HTML = r"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>Cluster NBR Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-*{box-sizing:border-box}
-html,body{margin:0;height:100%;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;font-size:12px;color:#c8cdd8;background:#0a0e1a}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;color:#e2e8f0;background:#0a0e1a;overflow:hidden}
 #app{display:flex;flex-direction:column;height:100vh}
+#hdr{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff;font-size:20px;font-weight:600;padding:10px 20px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
+#hdr .sub{font-size:11px;opacity:0.85;font-weight:400}
 #wrap{display:flex;flex:1;min-height:0;overflow:hidden}
-
-/* Sidebar */
-#side{width:260px;min-width:260px;overflow-y:auto;background:#0d1117;border-right:1px solid #1a1f2e;padding:12px;box-sizing:border-box}
-#side::-webkit-scrollbar{width:5px}
-#side::-webkit-scrollbar-track{background:#0a0e1a}
-#side::-webkit-scrollbar-thumb{background:#2a3142;border-radius:3px}
-
-/* Section headers */
-.sh{font-size:10px;font-weight:700;color:#6366f1;text-transform:uppercase;letter-spacing:1.2px;margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid #1a1f2e}
-.sh:first-child{margin-top:0}
-
-/* Search */
-.srch{position:relative;margin-bottom:12px}
-#q{width:100%;box-sizing:border-box;padding:8px 10px;font-size:12px;background:#1a1f2e;border:1px solid #2a3142;border-radius:4px;color:#e2e8f0;outline:none}
-#q:focus{border-color:#6366f1}
-#ac{position:absolute;top:100%;left:0;right:0;background:#1a1f2e;border:1px solid #2a3142;border-radius:4px;max-height:220px;overflow-y:auto;z-index:2000;display:none}
-.ai{padding:6px 10px;cursor:pointer;display:flex;gap:6px;align-items:center;border-bottom:1px solid #0d1117}
-.ai:hover,.ai.sel{background:#252b3d}.ai b{color:#818cf8;font-size:11px}.ai span{flex:1;color:#8b95a5;font-size:10px}
-
-/* Source info */
-.src-info{margin-bottom:12px}
-.src-title{font-size:13px;font-weight:700;color:#ef4444;margin-bottom:2px}
-.src-sub{font-size:10px;color:#8b95a5;line-height:1.4}
-
-/* Labels */
-.lbl-row{display:flex;align-items:center;justify-content:space-between;margin:6px 0;font-size:11px;color:#c8cdd8}
-.lbl-row b{color:#e2e8f0}
-.lbl-row label{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;color:#c8cdd8;margin:5px 0}
-.lbl-row label b{color:#e2e8f0}
-
-/* Inputs */
-input[type=range]{width:100%;accent-color:#6366f1;height:4px;margin:4px 0}
-select,input[type=text]{width:100%;font-size:11px;padding:5px 8px;background:#1a1f2e;color:#e2e8f0;border:1px solid #2a3142;border-radius:4px;outline:none;margin:4px 0}
-select:focus,input[type=text]:focus{border-color:#6366f1}
-input[type="color"]{width:32px;height:24px;border:1px solid #2a3142;border-radius:3px;background:#1a1f2e;cursor:pointer;padding:1px}
-.hint{font-size:9px;color:#64748b;margin:2px 0 6px;line-height:1.3}
-
-/* Buttons */
-.btn-row{display:flex;gap:6px;margin:8px 0}
-button{cursor:pointer;border:1px solid #2a3142;background:#1a1f2e;color:#c8cdd8;border-radius:4px;padding:5px 10px;font-size:11px;font-weight:500;transition:all 0.15s}
-button:hover{background:#252b3d;border-color:#6366f1;color:#fff}
-button.on{background:#6366f1;color:#fff;border-color:#6366f1}
-.btn-primary{background:#6366f1;color:#fff;border-color:#6366f1}
-.btn-primary:hover{background:#4f46e5}
-
-/* Stats */
-.stat{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:8px 0}
-.stat div{background:#1a1f2e;border:1px solid #2a3142;border-radius:4px;padding:6px 4px;text-align:center}
-.stat b{display:block;font-size:16px;color:#e2e8f0}
-.stat span{font-size:9px;color:#8b95a5;text-transform:uppercase;letter-spacing:0.5px}
-
-/* Neighbor list */
-.pills{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px}
-.pills button{border-radius:11px;padding:3px 8px;font-size:10px}
-.nb{border:1px solid #2a3142;border-radius:4px;padding:6px;margin:4px 0;cursor:pointer;background:#1a1f2e}
-.nb:hover{background:#252b3d;border-color:#6366f1}
-.nbt{display:flex;align-items:center;gap:5px}
-.nbt .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8b95a5;font-size:10px}
-.bd{color:#fff;font-size:9px;padding:2px 6px;border-radius:8px;white-space:nowrap;font-weight:600}
-.meta{font-size:9px;color:#64748b;margin:2px 0 0 20px}
-
-/* Legend */
-.lg{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:10px;color:#c8cdd8}
-.sw{width:12px;height:12px;border-radius:2px;display:inline-block}
-
-/* Map */
+#side{width:300px;min-width:300px;max-width:300px;overflow-y:auto;background:#0d1220;border-right:1px solid #1e293b;padding:12px;flex-shrink:0}
+#side::-webkit-scrollbar{width:5px}#side::-webkit-scrollbar-track{background:#0a0e1a}#side::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
 #mapbox{flex:1;position:relative;background:#020617;min-width:0}
 #map{height:100%;width:100%;--fs:13px}
 
-/* Labels on map */
-.lbl{font-weight:600;font-size:var(--fs);white-space:nowrap;text-shadow:1px 1px 2px #000,-1px -1px 2px #000,1px -1px 2px #000,-1px 1px 2px #000}
-.lbl-source{font-size:calc(var(--fs) + 2px)}.lbl-other{display:none}.zhi .lbl-other{display:block}.nolbl .lbl{display:none!important}.allblue .lbl-missing,.allblue .lbl-other{color:#60a5fa!important}
+.section-title{font-size:10px;font-weight:700;color:#60a5fa;text-transform:uppercase;letter-spacing:1px;margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid #1e293b}
+.section-title:first-child{margin-top:0}
+.search-label{font-size:10px;font-weight:700;color:#60a5fa;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+#q{width:100%;box-sizing:border-box;padding:7px 10px;font-size:12px;background:#1e293b;border:1px solid #334155;border-radius:4px;color:#e2e8f0;outline:none;margin-bottom:8px}
+#q:focus{border-color:#60a5fa}
+#ac{position:absolute;top:100%;left:0;right:0;background:#1e293b;border:1px solid #334155;border-radius:4px;max-height:220px;overflow-y:auto;z-index:2000;display:none}
+.ai{padding:6px 10px;cursor:pointer;display:flex;gap:6px;align-items:center;border-bottom:1px solid #0f172a;font-size:11px}
+.ai:hover,.ai.sel{background:#334155}.ai b{color:#60a5fa}.ai span{flex:1;color:#94a3b8;font-size:10px}
 
-/* Polygon handles */
-.vh{width:10px;height:10px;background:#fff;border:2px solid #6366f1;border-radius:50%;cursor:move}
+.src-title{font-size:14px;font-weight:700;color:#f97316;margin-bottom:2px}
+.src-sub{color:#94a3b8;font-size:11px;margin-bottom:2px}
+.src-info{color:#64748b;font-size:10px;margin-bottom:10px}
 
-/* Map buttons */
+.ctrl-row{display:flex;align-items:center;gap:6px;margin:6px 0;font-size:11px;color:#cbd5e1}
+.ctrl-row label{cursor:pointer;display:flex;align-items:center;gap:5px;flex:1}
+.ctrl-row input[type=checkbox]{accent-color:#60a5fa;margin:0}
+.ctrl-row b{color:#e2e8f0}
+.hint{font-size:9px;color:#64748b;margin:2px 0 6px 0}
+input[type=range]{width:100%;accent-color:#60a5fa;height:3px;margin:4px 0}
+select{width:100%;font-size:11px;padding:4px 6px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:3px;outline:none;margin:4px 0}
+select:focus{border-color:#60a5fa}
+input[type="color"]{width:32px;height:24px;border:1px solid #334155;border-radius:3px;background:#1e293b;cursor:pointer;padding:1px}
+.ctrl-label{font-size:11px;color:#94a3b8;margin:6px 0 3px}
+
+.btn-row{display:flex;gap:6px;margin:8px 0}
+.btn{flex:1;cursor:pointer;border:1px solid #334155;background:#1e293b;color:#e2e8f0;border-radius:4px;padding:5px 8px;font-size:11px;font-weight:500;text-align:center;transition:all 0.15s}
+.btn:hover{background:#334155;border-color:#60a5fa}
+.btn-primary{background:#3b82f6;border-color:#3b82f6;color:#fff}
+
+.stats{display:flex;gap:4px;margin:8px 0}
+.stat-box{flex:1;background:#1e293b;border:1px solid #334155;border-radius:4px;padding:6px 4px;text-align:center}
+.stat-box b{display:block;font-size:16px;font-weight:700}
+.stat-box span{font-size:9px;color:#94a3b8;text-transform:uppercase}
+
 #mbtn{position:absolute;top:8px;left:8px;z-index:1000;display:flex;gap:4px}
-.mb{background:#0d1117;color:#c8cdd8;box-shadow:0 2px 6px rgba(0,0,0,0.5);border:1px solid #1a1f2e;padding:5px 10px;font-size:11px;border-radius:4px}
-.mb:hover{background:#1a1f2e;color:#fff}.mb.on{background:#6366f1;color:#fff;border-color:#6366f1}
-.crosshair,.crosshair.leaflet-grab{cursor:crosshair!important}
+.mb{background:#0d1220;color:#e2e8f0;box-shadow:0 2px 6px rgba(0,0,0,0.5);border:1px solid #334155;padding:5px 10px;font-size:11px;border-radius:4px;cursor:pointer}
+.mb:hover{background:#1e293b;border-color:#60a5fa}.mb.on{background:#3b82f6;color:#fff;border-color:#3b82f6}
 
-/* Selection bar */
-#selbar{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#0d1117;border:1px solid #1a1f2e;border-radius:6px;padding:8px 12px;z-index:1000;display:none;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,0.5)}
+#rbox{position:absolute;top:8px;right:8px;background:#0d1220;border:1px solid #334155;border-radius:6px;padding:10px 12px;z-index:1000;display:none;min-width:220px;box-shadow:0 4px 12px rgba(0,0,0,0.5)}
+.rtip{background:#0d1220;border:1px solid #f87171;color:#f87171;font-weight:bold;font-size:10px;padding:2px 5px;border-radius:3px}
+
+#selbar{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#0d1220;border:1px solid #334155;border-radius:6px;padding:8px 12px;z-index:1000;display:none;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,0.5)}
 #selN{font-weight:bold;color:#f59e0b;min-width:70px;font-size:11px}
 
-/* Ruler */
-#rbox{position:absolute;top:8px;right:8px;background:#0d1117;border:1px solid #1a1f2e;border-radius:6px;padding:10px 12px;z-index:1000;display:none;min-width:240px;box-shadow:0 4px 12px rgba(0,0,0,0.5)}
-.rtip{background:#0d1117;border:1px solid #f87171;color:#f87171;font-weight:bold;font-size:10px;padding:2px 5px;border-radius:3px}
+#toast{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#10b981;color:#fff;padding:8px 16px;border-radius:5px;z-index:1000;display:none;font-weight:500;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.4)}
 
-/* Modal */
+.lbl{font-weight:600;font-size:var(--fs);white-space:nowrap;text-shadow:1px 1px 3px #000,-1px -1px 3px #000,1px -1px 3px #000,-1px 1px 3px #000}
+.lbl-source{font-size:calc(var(--fs) + 2px)}.lbl-other{display:none}.zhi .lbl-other{display:block}.nolbl .lbl{display:none!important}
+
+.vh{width:10px;height:10px;background:#fff;border:2px solid #60a5fa;border-radius:50%;cursor:move}
+.crosshair,.crosshair.leaflet-grab{cursor:crosshair!important}
+
 #mdl{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:5000;display:none;align-items:center;justify-content:center}
-.mbox{background:#0d1117;border-radius:8px;width:540px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;border:1px solid #1a1f2e}
-.mh,.fm,.mf{padding:12px 16px;display:flex;align-items:center;gap:8px}.mh{justify-content:space-between;border-bottom:1px solid #1a1f2e;font-size:13px;color:#818cf8;font-weight:600}
-.fm button.on{background:#6366f1;color:#fff;border-color:#6366f1}.mf{border-top:1px solid #1a1f2e}.mf span{flex:1;color:#8b95a5;font-size:11px}
-#mTa{margin:0 16px;height:240px;font-family:Consolas,monospace;font-size:11px;resize:none;box-sizing:border-box;background:#1a1f2e;color:#e2e8f0;border:1px solid #2a3142;border-radius:4px;padding:8px}
+.mbox{background:#1e293b;border-radius:8px;width:520px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;border:1px solid #334155}
+.mh,.fm,.mf{padding:12px 16px;display:flex;align-items:center;gap:8px}
+.mh{justify-content:space-between;border-bottom:1px solid #0f172a;font-size:13px;color:#60a5fa;font-weight:600}
+.fm button.on{background:#3b82f6;color:#fff;border-color:#3b82f6}
+.mf{border-top:1px solid #0f172a}.mf span{flex:1;color:#94a3b8;font-size:11px}
+#mTa{margin:0 16px;height:220px;font-family:Consolas,monospace;font-size:11px;resize:none;box-sizing:border-box;background:#0a0e1a;color:#e2e8f0;border:1px solid #334155;border-radius:4px;padding:8px}
 
-/* Toast */
-#toast{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#10b981;color:#fff;padding:8px 16px;border-radius:5px;z-index:1000;display:none;max-width:70%;font-weight:500;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.4)}
-.warn{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;border-radius:4px;padding:5px 7px;margin-top:6px;font-size:10px}
+#ftr{background:#0d1220;color:#94a3b8;font-size:11px;padding:8px 20px;border-top:1px solid #1e293b;flex-shrink:0;display:flex;justify-content:flex-end;align-items:center}
+#ftr a{color:#60a5fa;text-decoration:none}#ftr a:hover{text-decoration:underline}
 
-/* Footer */
-#ftr{position:absolute;bottom:0;right:0;background:rgba(10,14,26,0.85);color:#8b95a5;font-size:10px;padding:6px 12px;z-index:1000;border-top-left-radius:6px}
-#ftr a{color:#818cf8;text-decoration:none}
-#ftr a:hover{text-decoration:underline}
+.warn{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;border-radius:4px;padding:5px 8px;margin-top:6px;font-size:10px}
+.inside-ok{color:#10b981;font-size:10px;margin-top:4px}
+.inside-warn{color:#f59e0b;font-size:10px;margin-top:4px}
 
-/* Empty state */
-#empty{font-size:10px;color:#64748b;margin-top:8px;line-height:1.4}
+.nb{border:1px solid #334155;border-radius:4px;padding:6px;margin:4px 0;cursor:pointer;background:#1e293b;font-size:11px}
+.nb:hover{border-color:#60a5fa}
+.nbt{display:flex;align-items:center;gap:5px}
+.nbt .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#94a3b8;font-size:10px}
+.bd{color:#fff;font-size:9px;padding:1px 6px;border-radius:8px;white-space:nowrap;font-weight:600}
+.meta{font-size:9px;color:#64748b;margin:2px 0 0 20px}
+.pills{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px}
+.pills button{border-radius:10px;padding:2px 8px;font-size:9px;border:1px solid #334155;background:#1e293b;color:#cbd5e1;cursor:pointer}
+.pills button.on{background:#3b82f6;color:#fff;border-color:#3b82f6}
+
+/* Config panel */
+.cfg-panel{background:#1e293b;border:1px solid #334155;border-radius:4px;margin-bottom:12px;overflow:hidden}
+.cfg-header{background:#334155;padding:8px 10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:600;color:#60a5fa}
+.cfg-content{padding:10px;display:none}
+.cfg-content.active{display:block}
+.cfg-content input[type=text]{width:100%;padding:5px 7px;background:#0a0e1a;border:1px solid #334155;border-radius:3px;color:#e2e8f0;font-size:11px;box-sizing:border-box;margin:4px 0}
 </style></head><body>
 <div id="app">
+<div id="hdr"><span>Cluster Neighbor Visualization Tool</span><span class="sub">@Rajesh Dubey | rajesh.dubey@sds.com</span></div>
 <div id="wrap">
 <div id="side">
-  <div class="sh">Provide USID</div>
-  <div class="srch"><input id="q" placeholder="Enter USID or site name" autocomplete="off"><div id="ac"></div></div>
-  <div id="empty">Type a USID above, or click any site on the map.</div>
-  
-  <div id="panel" style="display:none">
-    <div class="src-info">
-      <div class="src-title" id="tSrc"></div>
-      <div class="src-sub" id="tSub"></div>
-      <div class="src-sub" id="tInfo"></div>
+
+  <!-- Collapsible Config Panel -->
+  <div class="cfg-panel">
+    <div class="cfg-header" onclick="toggleCfg()"><span>📁 Data Source Configuration</span><span id="cfgToggle">▼</span></div>
+    <div class="cfg-content" id="cfgContent">
+      <div class="ctrl-label">Site Data File Path</div>
+      <input type="text" id="cfgSite" placeholder="Local path or SharePoint link">
+      <div class="ctrl-label">Neighbor SQL Table Path</div>
+      <input type="text" id="cfgNbr" placeholder="Local path or SharePoint link">
+      <div class="ctrl-label">Use SharePoint Public Link</div>
+      <select id="cfgSP"><option value="no">No - Use Local Paths</option><option value="yes">Yes - SharePoint Public Links</option></select>
+      <button class="btn btn-primary" onclick="saveCfg()" style="margin-top:8px;width:100%">💾 Update Configuration</button>
     </div>
-    
-    <div class="sh">Polygon Controls</div>
-    <label><input type="checkbox" id="chkShow" checked> <b>Show polygon</b></label>
-    <label><input type="checkbox" id="chkEdit"> <b style="color:#818cf8">Enable editing</b></label>
+  </div>
+
+  <div class="search-label">PROVIDE USID</div>
+  <div style="position:relative">
+    <input id="q" placeholder="Enter USID or site name" autocomplete="off">
+    <div id="ac"></div>
+  </div>
+  <div id="empty" style="color:#64748b;font-size:10px;margin-top:4px">Type a USID above, or click any site on the map.</div>
+
+  <div id="panel" style="display:none">
+    <div class="src-title" id="tSrc"></div>
+    <div class="src-sub" id="tSub"></div>
+    <div class="src-info" id="tInfo"></div>
+
+    <div class="section-title">POLYGON CONTROLS</div>
+    <div class="ctrl-row"><label><input type="checkbox" id="chkShow" checked> <b>Show polygon boundary</b></label></div>
+    <div class="ctrl-row"><label><input type="checkbox" id="chkEdit"> <b style="color:#60a5fa">Enable polygon editing</b></label></div>
     <div class="hint">Drag handles, click line to add, right-click to delete</div>
-    
-    <div class="lbl-row"><span>Buffer: <b id="bufVal"></b> mi</span></div>
+    <div class="ctrl-label">Buffer: <b id="bufVal"></b> miles</div>
     <input type="range" id="buf" min="0" max="6" step="0.1">
-    
-    <div class="lbl-row"><span>Line: <b id="wVal">3</b> px</span></div>
+    <div class="ctrl-label">Line thickness: <b id="wVal">3</b> px</div>
     <input type="range" id="pw" min="1" max="10" step="1" value="3">
-    
     <select id="ps"><option value="" selected>Solid</option><option value="6, 6">Dashed</option><option value="2, 4">Dotted</option></select>
-    
-    <div class="lbl-row"><span>Colour</span><input type="color" id="pc" value="#6366f1"></div>
-    
-    <div class="lbl-row" style="margin-top:8px"><span>Keep OUTSIDE:</span></div>
-    <select id="excl"><option value="missing" selected>Missing / suggested</option><option value="all">All non-defined</option><option value="none">None</option></select>
-    
-    <div class="btn-row"><button id="btnRebuild" class="btn-primary">Rebuild</button><button id="btnFit">Fit view</button></div>
-    <div class="hint" id="inside" style="margin-top:4px"></div>
-    
-    <div class="sh">View Controls</div>
-    <div class="lbl-row"><span>Sector: <b id="sVal">1.0</b> x</span></div>
+    <div class="ctrl-row"><span style="color:#94a3b8">Line colour</span><input type="color" id="pc" value="#3b82f6"></div>
+    <div class="ctrl-label">Keep these sites OUTSIDE the polygon:</div>
+    <select id="excl"><option value="missing" selected>Missing / suggested sites (only defined NBRs inside)</option><option value="all">All non-defined sites</option><option value="none">None (plain convex hull)</option></select>
+    <div class="btn-row"><button class="btn" id="btnRebuild">Rebuild from ticked sites</button><button class="btn" id="btnFit">Fit view</button></div>
+    <div id="inside"></div>
+
+    <div class="section-title">VIEW CONTROLS</div>
+    <div class="ctrl-label">Sector size: <b id="sVal">1.0</b> x</div>
     <input type="range" id="ss" min="0.5" max="6" step="0.1" value="1">
-    
-    <div class="lbl-row"><span>Font: <b id="fVal">13</b> px</span></div>
+    <div class="ctrl-label">Node name font: <b id="fVal">13</b> px</div>
     <input type="range" id="fs" min="8" max="28" step="1" value="13">
-    
-    <label><input type="checkbox" id="vLines" checked> HO lines</label>
-    <label><input type="checkbox" id="vMiss" checked> Missing sites</label>
-    <label><input type="checkbox" id="vOther" checked> Other sites</label>
-    <label><input type="checkbox" id="vLbl" checked> Labels</label>
-    <label><input type="checkbox" id="vBlue"> All blue</label>
-    
-    <div class="sh">Summary</div>
-    <div class="stat" id="stats"></div>
+    <div class="ctrl-row"><label><input type="checkbox" id="vLines" checked> HO lines (source → NBR)</label></div>
+    <div class="ctrl-row"><label><input type="checkbox" id="vMiss" checked> Missing / suggested sites</label></div>
+    <div class="ctrl-row"><label><input type="checkbox" id="vOther" checked> Other sites</label></div>
+    <div class="ctrl-row"><label><input type="checkbox" id="vLbl" checked> Site labels</label></div>
+    <div class="ctrl-row"><label><input type="checkbox" id="vBlue"> <b>All sites blue</b> (except source)</label></div>
+
+    <div class="section-title">NEIGHBOUR SUMMARY</div>
+    <div class="stats" id="stats"></div>
     <div id="warn"></div>
-    
-    <div class="sh">Neighbours</div>
+
+    <div class="section-title">NEIGHBOURS <span style="font-weight:normal;color:#64748b">(tick = include in polygon)</span></div>
     <div class="pills" id="pills"></div>
     <div id="list"></div>
-    
-    <div class="btn-row"><button id="btnCsv">Export missing</button><button id="btnCsvAll">All sources</button></div>
-    
-    <div class="sh">Legend</div>
-    <div class="lg"><span class="sw" style="background:#ef4444"></span>Source</div>
-    <div class="lg"><span class="sw" style="background:#3b82f6"></span>Defined NBR</div>
-    <div class="lg"><span class="sw" style="background:#f59e0b"></span>Missing</div>
-    <div class="lg"><span class="sw" style="background:#9ca3af"></span>Other</div>
-    <div class="lg"><span style="width:20px;border-top:2px solid #10b981"></span>HO link</div>
-    <div class="lg"><span style="width:20px;border-top:2px dashed #f59e0b"></span>Missing link</div>
+    <div class="btn-row"><button class="btn" id="btnCsv">Export missing (this source)</button><button class="btn" id="btnCsvAll">Export missing (all sources)</button></div>
+
+    <div class="section-title">LEGEND</div>
+    <div style="font-size:11px;color:#cbd5e1">
+      <div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:12px;height:12px;background:#f97316;border-radius:2px"></span>Source site</div>
+      <div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:12px;height:12px;background:#3b82f6;border-radius:2px"></span>Defined neighbour</div>
+      <div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:12px;height:12px;background:#f59e0b;border-radius:2px"></span>Missing / suggested</div>
+      <div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:12px;height:12px;background:#6b7280;border-radius:2px"></span>Other site</div>
+      <div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:20px;border-top:2px solid #10b981"></span>HO link</div>
+      <div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:20px;border-top:2px dashed #f59e0b"></span>Missing link</div>
+    </div>
   </div>
 </div>
 
 <div id="mapbox">
   <div id="map"></div>
-  <div id="mbtn"><button class="mb" id="tg">☰</button><button class="mb" id="btnSel">☑ Select</button><button class="mb" id="btnRul">📏 Ruler</button></div>
-  <div id="rbox"><b style="color:#818cf8;font-size:11px">Ruler</b>
-    <div id="rTot" style="margin:5px 0 2px;font-size:12px;font-weight:bold;color:#f87171">Total: 0.00 km / 0.00 mi</div>
-    <div id="rSeg" class="hint" style="font-size:10px"></div>
-    <div class="btn-row" style="margin-top:5px"><button id="rUndo">Undo</button><button id="rClr">Clear</button></div>
+  <div id="mbtn">
+    <button class="mb" id="tg">☰ Panel</button>
+    <button class="mb" id="btnSel">☑ Select sites</button>
+    <button class="mb" id="btnRul">📏 Ruler</button>
   </div>
-  <div id="selbar"><span id="selN">0 selected</span><button id="selCopy">Copy</button><button id="selCsv">CSV</button><button id="selVis">Select visible</button><button id="selClr">Clear</button></div>
+  <div id="rbox">
+    <b style="color:#60a5fa;font-size:11px">Distance ruler</b>
+    <div class="hint">Click points on the map (click a site to snap to it)</div>
+    <div id="rTot" style="margin:6px 0 2px;font-size:12px;font-weight:bold;color:#f87171">Total: 0.00 km / 0.00 mi</div>
+    <div id="rSeg" class="hint"></div>
+    <div class="btn-row" style="margin-top:6px"><button class="btn" id="rUndo">Undo last point</button><button class="btn" id="rClr">Clear</button></div>
+  </div>
+  <div id="selbar">
+    <span id="selN">0 selected</span>
+    <button class="btn" id="selCopy">Copy</button>
+    <button class="btn" id="selCsv">Export CSV</button>
+    <button class="btn" id="selVis">Select all visible</button>
+    <button class="btn" id="selClr">Clear</button>
+  </div>
   <div id="toast"></div>
-  <div id="ftr">@Rajesh Dubey for any support, please connect with <a href="mailto:rajesh.dubey@sdr.com">rajesh.dubey@sdr.com</a></div>
 </div>
+</div>
+<div id="ftr">@Rajesh Dubey, please connect with <a href="mailto:rajesh.dubey@sds.com">rajesh.dubey@sds.com</a> for any support</div>
 </div>
 
-<div id="mdl"><div class="mbox"><div class="mh"><b>Selected sites</b><button id="mX">✕</button></div>
-  <div class="fm"><button data-f="excel" class="on">Excel</button><button data-f="usid">USID</button><button data-f="csv">CSV</button></div>
+<div id="mdl"><div class="mbox">
+  <div class="mh"><b>Selected sites</b><button id="mX" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px">✕</button></div>
+  <div class="fm"><button data-f="excel" class="btn on">Excel (tab)</button><button data-f="usid" class="btn">USID only</button><button data-f="csv" class="btn">CSV</button></div>
   <textarea id="mTa" readonly></textarea>
-  <div class="mf"><span id="mN"></span><button id="mCopy">Copy</button><button id="mDl">Download</button></div>
+  <div class="mf"><span id="mN"></span><button class="btn" id="mCopy">Copy to clipboard</button><button class="btn" id="mDl">Download CSV</button></div>
 </div></div>
 
 <script>
@@ -385,14 +342,25 @@ const D = __DATA__;
 const S = D.sites, CFG = D.cfg, ALL = Object.keys(S);
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const COL = {source:'#ef4444', ok:'#3b82f6', missing:'#f59e0b', other:'#9ca3af'};
-const TXT = {source:'#ef4444', ok:'#3b82f6', missing:'#f59e0b', other:'#6b7280'};
+const COL = {source:'#f97316', ok:'#3b82f6', missing:'#f59e0b', other:'#6b7280'};
+const TXT = {source:'#f97316', ok:'#3b82f6', missing:'#f59e0b', other:'#9ca3af'};
 const STAT = {ok:['Defined','#10b981'], zero_ho:['0% HO','#f59e0b'], no_coords:['Not in file','#ef4444'], not_defined:['Suggested','#8b5cf6']};
 const WHY = {no_coords:'Defined in table, not in site file', zero_ho:'Defined but 0 HO', not_defined:'Closest site, not in table'};
 const MI = 69.093;
 
 function hav(la1, lo1, la2, lo2) { const r = Math.PI/180, a = Math.sin((la2-la1)*r/2)**2 + Math.cos(la1*r)*Math.cos(la2*r)*Math.sin((lo2-lo1)*r/2)**2; return 2*3958.8*Math.asin(Math.sqrt(a)); }
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3000); }
+
+function toggleCfg() {
+  const c = $('cfgContent'), t = $('cfgToggle');
+  if (c.classList.contains('active')) { c.classList.remove('active'); t.textContent = '▼'; }
+  else { c.classList.add('active'); t.textContent = '▲'; }
+}
+function saveCfg() {
+  const s = $('cfgSite').value, n = $('cfgNbr').value, sp = $('cfgSP').value;
+  if (!s || !n) { alert('Please provide both file paths'); return; }
+  alert('Configuration saved!\n\nNote: For SharePoint links, use direct download links (ending in ?download=1).\n\nTo apply backend changes, update the paths in the Python script and re-run.');
+}
 
 function analyse(u) {
   const s = S[u], entry = D.nbr[u], rows = entry ? entry[1] : [];
@@ -409,10 +377,10 @@ function analyse(u) {
 
 const map = L.map('map').setView([39.5, -98.35], 4);
 const base = {
-  'Topo': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19}),
-  'Street': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19}),
-  'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19}),
-  'Light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {maxZoom:19})
+  'Topo': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'Esri, USGS, NOAA, OpenStreetMap contributors'}),
+  'Street': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contributors'}),
+  'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'Esri'}),
+  'Light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap &copy; CARTO'})
 };
 base.Topo.addTo(map); L.control.layers(base, null, {position:'topright'}).addTo(map);
 map.createPane('poly'); map.getPane('poly').style.zIndex = 450;
@@ -424,13 +392,22 @@ const G = {other:L.layerGroup(), missing:L.layerGroup(), ok:L.layerGroup(), sour
 const LG = {ok:L.layerGroup(), missing:L.layerGroup()};
 Object.values(G).concat(Object.values(LG)).forEach(g => g.addTo(map));
 
-function recolor() { const blue = $('vBlue').checked; const c = role => blue && role !== 'source' ? COL.ok : COL[role]; wedges.forEach(w => w.p.setStyle({fillColor:c(w.role)})); mapEl.classList.toggle('allblue', blue); }
+function recolor() { const blue = $('vBlue').checked; const c = role => blue && role !== 'source' ? COL.ok : COL[role]; wedges.forEach(w => w.p.setStyle({fillColor:c(w.role)})); }
 function setLayer(g, on) { on ? map.addLayer(g) : map.removeLayer(g); }
 function applyVis() { setLayer(G.other, $('vOther').checked); setLayer(G.missing, $('vMiss').checked); setLayer(LG.ok, $('vLines').checked); setLayer(LG.missing, $('vLines').checked && $('vMiss').checked); mapEl.classList.toggle('nolbl', !$('vLbl').checked); }
 ['vLines','vMiss','vOther','vLbl'].forEach(id => $(id).addEventListener('change', applyVis));
 $('vBlue').addEventListener('change', recolor);
 
-function wedge(lat, lon, az, r) { const la = lat*Math.PI/180, lo = lon*Math.PI/180, d = r/6371000, pts = [[lat, lon]]; for (let i = 0; i <= 13; i++) { const b = (az - 32.5 + i*5)*Math.PI/180; const pl = Math.asin(Math.sin(la)*Math.cos(d) + Math.cos(la)*Math.sin(d)*Math.cos(b)); const pn = lo + Math.atan2(Math.sin(b)*Math.sin(d)*Math.cos(la), Math.cos(d) - Math.sin(la)*Math.sin(pl)); pts.push([pl*180/Math.PI, pn*180/Math.PI]); } return pts; }
+function wedge(lat, lon, az, r) {
+  const la = lat*Math.PI/180, lo = lon*Math.PI/180, d = r/6371000, pts = [[lat, lon]];
+  for (let i = 0; i <= 13; i++) {
+    const b = (az - 32.5 + i*5)*Math.PI/180;
+    const pl = Math.asin(Math.sin(la)*Math.cos(d) + Math.cos(la)*Math.sin(d)*Math.cos(b));
+    const pn = lo + Math.atan2(Math.sin(b)*Math.sin(d)*Math.cos(la), Math.cos(d) - Math.sin(la)*Math.sin(pl));
+    pts.push([pl*180/Math.PI, pn*180/Math.PI]);
+  }
+  return pts;
+}
 
 let LAT0 = 0, LON0 = 0;
 const toXY = (lat, lon) => [(lon - LON0)*Math.cos(LAT0*Math.PI/180)*MI, (lat - LAT0)*MI];
@@ -443,10 +420,10 @@ function bufferHull(hull, miles) { const cLat = hull.reduce((a, p) => a + p[0], 
 function carvePolygon(poly, targets, members, W, M) { let done = 0, skipped = 0; const gone = []; const bdist = (pl, t) => Math.min(...pl.map((a, i) => segInfo(t, a, pl[(i+1) % pl.length]).d)); targets.map(t => ({p:t, d:bdist(poly, t)})).sort((a, b) => a.d - b.d).forEach(o => { const p = o.p; if (!pip(p, poly)) { gone.push(p); return; } const edges = poly.map((a, i) => Object.assign({i, a, b:poly[(i+1) % poly.length]}, segInfo(p, a, poly[(i+1) % poly.length]))).filter(e => e.d > 1e-6 && e.L > 1e-6).sort((x, y) => x.d - y.d).slice(0, 4); for (const e of edges) { const ux = (p[0]-e.q[0])/e.d, uy = (p[1]-e.q[1])/e.d; const tip = [p[0] + ux*M, p[1] + uy*M], lerp = t => [e.a[0] + (e.b[0]-e.a[0])*t, e.a[1] + (e.b[1]-e.a[1])*t]; const ins = []; if (e.t*e.L > W) ins.push(lerp(e.t - W/e.L)); ins.push(tip); if ((1-e.t)*e.L > W) ins.push(lerp(e.t + W/e.L)); const cand = poly.slice(0, e.i + 1).concat(ins, poly.slice(e.i + 1)); if (!pip(p, cand) && members.every(m => pip(m, cand)) && gone.every(g => !pip(g, cand))) { poly = cand; gone.push(p); done++; return; } } skipped++; }); return {poly, done, skipped}; }
 
 let cur = null, wedges = [], dots = [], siteLayers = {}, radius = CFG.radiusM, incl = {}, polyPts = [], dirty = false, handles = [], lastBuf = CFG.buffer, filter = 'all';
-const poly = L.polygon([], {pane:'poly', color:'#6366f1', weight:3, fill:false, bubblingMouseEvents:false}).addTo(map);
+const poly = L.polygon([], {pane:'poly', color:'#3b82f6', weight:3, fill:false, bubblingMouseEvents:false}).addTo(map);
 
-function tip(u, extra) { const s = S[u], n = cur && cur.NB[u]; let h = '<b>' + esc(s[0]) + '</b><br>USID: ' + esc(u); if (cur && u === cur.src) h += '<br><span style="color:#ef4444">SOURCE</span>'; else if (n) { h += '<br>' + STAT[n.st][0]; if (n.pct != null) h += ' · HO ' + n.pct.toFixed(1) + '%'; if (n.d != null) h += ' · ' + n.d + ' mi'; } return h + (extra || ''); }
-const popup = (u, extra) => tip(u, extra) + '<br><a href="#" onclick="loadSource(' + String(u).replace(/'/g, '') + ');return false" style="color:#818cf8">Load as source</a>';
+function tip(u, extra) { const s = S[u], n = cur && cur.NB[u]; let h = '<b>' + esc(s[0]) + '</b><br>USID: ' + esc(u); if (cur && u === cur.src) h += '<br><span style="color:#f97316">SOURCE</span>'; else if (n) { h += '<br>' + STAT[n.st][0]; if (n.pct != null) h += ' · HO ' + n.pct.toFixed(1) + '%'; if (n.d != null) h += ' · ' + n.d + ' mi'; } return h + (extra || ''); }
+const popup = (u, extra) => tip(u, extra) + '<br><a href="#" onclick="loadSource(' + String(u).replace(/'/g, '') + ');return false" style="color:#60a5fa">Load as source</a>';
 
 function loadSource(u) {
   u = String(u).trim().toUpperCase(); if (!S[u]) { toast('USID not found'); return; }
@@ -472,20 +449,25 @@ function loadSource(u) {
   incl = {}; incl[u] = true; A.nbrs.forEach(n => { if (S[n.u]) incl[n.u] = (n.st === 'ok'); });
   $('empty').style.display = 'none'; $('panel').style.display = ''; $('q').value = u;
   $('tSrc').textContent = 'Source: ' + u + ' (' + src[0] + ')';
-  $('tSub').textContent = A.cluster || (D.nbr[u] ? '' : 'No neighbour definition in SQL table');
-  $('tInfo').textContent = src[1].toFixed(4) + ', ' + src[2].toFixed(4) + ' | ' + src[3].length + ' cell(s)';
+  $('tSub').textContent = A.cluster || (D.nbr[u] ? '' : 'No neighbour definition in SQL table for this USID');
+  $('tInfo').textContent = src[1].toFixed(5) + ', ' + src[2].toFixed(5) + ' | ' + src[3].length + ' cell(s)';
   const c = st => A.nbrs.filter(n => n.st === st).length;
-  $('stats').innerHTML = [['Defined', A.defined, '#3b82f6'], ['OK', c('ok'), '#10b981'], ['Issue', c('no_coords') + c('zero_ho'), '#f59e0b'], ['Suggested', c('not_defined'), '#8b5cf6']].map(x => '<div><b style="color:' + x[2] + '">' + x[1] + '</b><span>' + x[0] + '</span></div>').join('');
+  $('stats').innerHTML = [
+    ['Defined (table)', A.defined, '#3b82f6'],
+    ['Plotted OK', c('ok'), '#10b981'],
+    ['Defined, issue', c('no_coords') + c('zero_ho'), '#f59e0b'],
+    ['Suggested', c('not_defined'), '#8b5cf6']
+  ].map(x => '<div class="stat-box"><b style="color:' + x[2] + '">' + x[1] + '</b><span>' + x[0] + '</span></div>').join('');
   const nc = A.nbrs.filter(n => n.st === 'no_coords').map(n => n.u);
-  $('warn').innerHTML = nc.length ? '<div class="warn">Not in site file: <b>' + nc.map(esc).join(', ') + '</b></div>' : '';
+  $('warn').innerHTML = nc.length ? '<div class="warn">Defined in SQL table but NOT found in the site file (cannot be plotted): <b>' + nc.map(esc).join(', ') + '</b></div>' : '';
   filter = 'all'; renderPills(); renderList();
-  if (!D.nbr[u]) toast('No neighbour definition for ' + u);
+  if (!D.nbr[u]) toast('No neighbour definition for ' + u + ' - showing closest-site suggestions only');
   buildPoly(); fit();
 }
 
-function buildPoly() { const pts = Object.keys(incl).filter(k => incl[k] && S[k]).map(k => [S[k][1], S[k][2]]); const hull = convexHull(pts); polyPts = hull.length >= 3 ? bufferHull(hull, parseFloat($('buf').value)) : []; poly.setLatLngs(polyPts); applyExclusion(); dirty = false; makeHandles(); updateInside(); if (!polyPts.length) toast('Need at least 3 ticked sites'); }
-function tryRebuild() { if (dirty && !confirm('Discard manual edits?')) return false; buildPoly(); return true; }
-function updateInside() { if (!cur || !polyPts.length) { $('inside').innerHTML = ''; return; } const P = polyPts.map(p => toXY(p[0], p[1])); const ins = Object.keys(cur.role).filter(k => cur.role[k] === 'missing' && !incl[k] && pip(toXY(S[k][1], S[k][2]), P)); $('inside').innerHTML = ins.length ? '<span style="color:#f59e0b">' + ins.length + ' missing inside</span>' : '<span style="color:#10b981">No missing inside</span>'; }
+function buildPoly() { const pts = Object.keys(incl).filter(k => incl[k] && S[k]).map(k => [S[k][1], S[k][2]]); const hull = convexHull(pts); polyPts = hull.length >= 3 ? bufferHull(hull, parseFloat($('buf').value)) : []; poly.setLatLngs(polyPts); applyExclusion(); dirty = false; makeHandles(); updateInside(); if (!polyPts.length) toast('Need at least 3 ticked sites to form a polygon'); }
+function tryRebuild() { if (dirty && !confirm('Rebuilding will discard your manual polygon edits. Continue?')) return false; buildPoly(); return true; }
+function updateInside() { if (!cur || !polyPts.length) { $('inside').innerHTML = ''; return; } const P = polyPts.map(p => toXY(p[0], p[1])); const ins = Object.keys(cur.role).filter(k => cur.role[k] === 'missing' && !incl[k] && pip(toXY(S[k][1], S[k][2]), P)); $('inside').innerHTML = ins.length ? '<div class="inside-warn">' + ins.length + ' missing site(s) inside polygon: ' + ins.map(k => esc(S[k][0])).join(', ') + '</div>' : '<div class="inside-ok">No missing sites inside the polygon</div>'; }
 function clearHandles() { handles.forEach(h => map.removeLayer(h)); handles = []; }
 function makeHandles() { clearHandles(); if (!$('chkEdit').checked || !$('chkShow').checked) return; polyPts.forEach((pt, i) => { const h = L.marker(pt, {draggable:true, zIndexOffset:1000, icon:L.divIcon({className:'', html:'<div class="vh"></div>', iconSize:[10, 10], iconAnchor:[5, 5]})}).addTo(map); h.on('drag', e => { const ll = e.target.getLatLng(); polyPts[i] = [ll.lat, ll.lng]; poly.setLatLngs(polyPts); dirty = true; }); h.on('dragend', updateInside); h.on('contextmenu', () => { if (polyPts.length > 3) { polyPts.splice(i, 1); poly.setLatLngs(polyPts); dirty = true; makeHandles(); updateInside(); } }); handles.push(h); }); }
 poly.on('click', e => { if (!$('chkEdit').checked || polyPts.length < 3) return; const P = ll => map.latLngToLayerPoint(ll), c = P(e.latlng); let best = 1, min = Infinity; polyPts.forEach((a, i) => { const d = L.LineUtil.pointToSegmentDistance(c, P(a), P(polyPts[(i+1) % polyPts.length])); if (d < min) { min = d; best = i + 1; } }); polyPts.splice(best, 0, [e.latlng.lat, e.latlng.lng]); poly.setLatLngs(polyPts); dirty = true; makeHandles(); updateInside(); });
@@ -504,75 +486,98 @@ $('fs').addEventListener('input', e => { $('fVal').textContent = e.target.value;
 function fit() { if (!cur) return; const b = L.latLngBounds([]); if (polyPts.length && $('chkShow').checked) polyPts.forEach(p => b.extend(p)); Object.keys(cur.role).forEach(k => b.extend([S[k][1], S[k][2]])); if (b.isValid()) map.fitBounds(b, {padding:[30, 30]}); }
 $('btnFit').addEventListener('click', fit); $('tg').addEventListener('click', () => { const s = $('side'); s.style.display = s.style.display === 'none' ? '' : 'none'; setTimeout(() => map.invalidateSize(), 50); });
 
-const PILLS = [['all', 'All'], ['ok', 'Defined OK'], ['miss', 'Missing']];
+const PILLS = [['all', 'All'], ['ok', 'Defined OK'], ['miss', 'Missing / suggested']];
 function renderPills() { $('pills').innerHTML = PILLS.map(p => '<button data-f="' + p[0] + '" class="' + (filter === p[0] ? 'on' : '') + '">' + p[1] + '</button>').join(''); }
-function renderList() { const rows = cur.nbrs.filter(n => filter === 'all' || (filter === 'ok' && n.st === 'ok') || (filter === 'miss' && n.st !== 'ok')); $('list').innerHTML = rows.length ? rows.map(n => { const has = !!S[n.u]; const meta = [n.ho != null ? (n.ho === 0 ? '<span style="color:#f59e0b">HO 0</span>' : 'HO ' + n.ho) : '', n.pct != null ? n.pct.toFixed(1) + '%' : '', n.d != null ? n.d + ' mi' : ''].filter(Boolean).join(' · '); return '<div class="nb" data-u="' + esc(n.u) + '"><div class="nbt">' + (has ? '<input type="checkbox" class="inc" data-u="' + esc(n.u) + '"' + (incl[n.u] ? ' checked' : '') + '>' : '<span style="width:13px"></span>') + '<b style="font-size:11px;color:#e2e8f0">' + esc(n.u) + '</b><span class="nm">' + esc(n.n) + '</span><span class="bd" style="background:' + STAT[n.st][1] + '">' + STAT[n.st][0] + '</span></div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>'; }).join('') : '<div class="hint">Nothing to show.</div>'; }
+function renderList() { const rows = cur.nbrs.filter(n => filter === 'all' || (filter === 'ok' && n.st === 'ok') || (filter === 'miss' && n.st !== 'ok')); $('list').innerHTML = rows.length ? rows.map(n => { const has = !!S[n.u]; const meta = [n.ho != null ? (n.ho === 0 ? '<span style="color:#f59e0b">HO 0</span>' : 'HO ' + n.ho) : '', n.pct != null ? n.pct.toFixed(1) + '%' : '', n.d != null ? n.d + ' mi' : '', n.st === 'not_defined' ? 'not in SQL table' : ''].filter(Boolean).join(' · '); return '<div class="nb" data-u="' + esc(n.u) + '"><div class="nbt">' + (has ? '<input type="checkbox" class="inc" data-u="' + esc(n.u) + '"' + (incl[n.u] ? ' checked' : '') + '>' : '<span style="width:13px"></span>') + '<b>' + esc(n.u) + '</b><span class="nm">' + esc(n.n) + '</span><span class="bd" style="background:' + STAT[n.st][1] + '">' + STAT[n.st][0] + '</span></div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>'; }).join('') : '<div class="hint">Nothing to show.</div>'; }
 $('pills').addEventListener('click', e => { if (e.target.dataset.f) { filter = e.target.dataset.f; renderPills(); renderList(); } });
 $('list').addEventListener('change', e => { if (!e.target.classList.contains('inc')) return; const u = e.target.dataset.u; incl[u] = e.target.checked; if (!tryRebuild()) { e.target.checked = !e.target.checked; incl[u] = e.target.checked; } });
-$('list').addEventListener('click', e => { if (e.target.closest('.inc')) return; const row = e.target.closest('.nb'); if (!row) return; const s = S[row.dataset.u]; if (s) map.flyTo([s[1], s[2]], Math.max(map.getZoom(), 13)); });
+$('list').addEventListener('click', e => { if (e.target.closest('.inc')) return; const row = e.target.closest('.nb'); if (!row) return; const s = S[row.dataset.u]; if (s) map.flyTo([s[1], s[2]], Math.max(map.getZoom(), 13)); else toast(row.dataset.u + ' has no coordinates in the site file'); });
 
 function csvDownload(rows, name) { const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; const csv = [['Source_USID','Missing_USID','Site_Name','Reason','HO_ATT','Pct_Sharing','Dist_miles','Latitude','Longitude']].concat(rows).map(r => r.map(q).join(',')).join('\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'})); a.download = name; a.click(); }
 const missRows = A => A.nbrs.filter(n => n.st !== 'ok').map(n => [A.src, n.u, n.n, WHY[n.st], n.ho, n.pct, n.d, n.lat, n.lon]);
-$('btnCsv').addEventListener('click', () => { const rows = missRows(cur); if (!rows.length) { toast('No missing'); return; } csvDownload(rows, 'missing_' + cur.src + '.csv'); });
-$('btnCsvAll').addEventListener('click', () => { toast('Analysing all...'); setTimeout(() => { let rows = []; Object.keys(D.nbr).forEach(u => { if (S[u]) rows = rows.concat(missRows(analyse(u))); }); if (!rows.length) { toast('No missing'); return; } csvDownload(rows, 'missing_all.csv'); toast('Exported ' + rows.length + ' rows'); }, 50); });
+$('btnCsv').addEventListener('click', () => { const rows = missRows(cur); if (!rows.length) { toast('No missing neighbours'); return; } csvDownload(rows, 'missing_neighbors_' + cur.src + '.csv'); });
+$('btnCsvAll').addEventListener('click', () => { toast('Analysing all sources ...'); setTimeout(() => { let rows = []; Object.keys(D.nbr).forEach(u => { if (S[u]) rows = rows.concat(missRows(analyse(u))); }); if (!rows.length) { toast('No missing neighbours'); return; } csvDownload(rows, 'missing_neighbors_all_sources.csv'); toast('Exported ' + rows.length + ' rows'); }, 50); });
 
 let acIdx = -1;
 function acHits(v) { v = v.trim().toUpperCase(); if (v.length < 2) return []; const starts = [], inc = []; for (const k of ALL) { const nm = String(S[k][0]).toUpperCase(); if (k === v || k.startsWith(v) || nm.startsWith(v)) starts.push(k); else if (k.includes(v) || nm.includes(v)) inc.push(k); if (starts.length >= 40) break; } return starts.concat(inc).slice(0, 40); }
-function renderAc() { const hits = acHits($('q').value), dd = $('ac'); acIdx = -1; if (!hits.length) { dd.style.display = 'none'; return; } dd.innerHTML = hits.map(k => '<div class="ai" data-u="' + esc(k) + '"><b>' + esc(k) + '</b><span>' + esc(S[k][0]) + '</span></div>').join(''); dd.style.display = 'block'; }
+function renderAc() { const hits = acHits($('q').value), dd = $('ac'); acIdx = -1; if (!hits.length) { dd.style.display = 'none'; dd.innerHTML = ''; return; } dd.innerHTML = hits.map(k => '<div class="ai" data-u="' + esc(k) + '"><b>' + esc(k) + '</b><span>' + esc(S[k][0]) + '</span>' + (D.nbr[k] ? '<i style="color:#10b981;font-size:10px">✓ cluster</i>' : '') + '</div>').join(''); dd.style.display = 'block'; }
 function pick(u) { $('ac').style.display = 'none'; loadSource(u); }
 $('q').addEventListener('input', renderAc);
 $('q').addEventListener('keydown', e => { const items = $('ac').querySelectorAll('.ai'); if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (!items.length) return; e.preventDefault(); acIdx = Math.max(0, Math.min(items.length - 1, acIdx + (e.key === 'ArrowDown' ? 1 : -1))); items.forEach((el, i) => el.classList.toggle('sel', i === acIdx)); } else if (e.key === 'Enter') { e.preventDefault(); const v = $('q').value.trim().toUpperCase(); if (acIdx >= 0 && items[acIdx]) pick(items[acIdx].dataset.u); else if (S[v]) pick(v); else if (items.length) pick(items[0].dataset.u); } else if (e.key === 'Escape') $('ac').style.display = 'none'; });
 $('ac').addEventListener('mousedown', e => { const it = e.target.closest('.ai'); if (it) { e.preventDefault(); pick(it.dataset.u); } });
-document.addEventListener('click', e => { if (!e.target.closest('.srch')) $('ac').style.display = 'none'; });
+document.addEventListener('click', e => { if (!e.target.closest('.srch') && !e.target.closest('#q')) $('ac').style.display = 'none'; });
 
 const selected = new Set(); let selMode = false, rulerOn = false, rPts = [], fmtKind = 'excel';
 const rLayer = L.layerGroup().addTo(map); const rLine = L.polyline([], {color:'#f87171', weight:3, dashArray:'8,5', interactive:false});
-function setMode(m) { selMode = m === 'sel'; rulerOn = m === 'ruler'; $('btnSel').classList.toggle('on', selMode); $('btnRul').classList.toggle('on', rulerOn); mapEl.classList.toggle('crosshair', selMode || rulerOn); $('rbox').style.display = (rulerOn || rPts.length) ? 'block' : 'none'; updateSelBar(); }
+function setMode(m) { selMode = m === 'sel'; rulerOn = m === 'ruler'; $('btnSel').classList.toggle('on', selMode); $('btnRul').classList.toggle('on', rulerOn); mapEl.classList.toggle('crosshair', selMode || rulerOn); $('rbox').style.display = (rulerOn || rPts.length) ? 'block' : 'none'; updateSelBar(); if (selMode) toast('Select mode: click sites on the map to select / unselect'); if (rulerOn) toast('Ruler: click points on the map'); }
 $('btnSel').addEventListener('click', () => setMode(selMode ? null : 'sel')); $('btnRul').addEventListener('click', () => setMode(rulerOn ? null : 'ruler'));
 function siteClick(k, e) { if (selMode) { L.DomEvent.stopPropagation(e); map.closePopup(); toggleSel(k); } else if (rulerOn) { L.DomEvent.stopPropagation(e); map.closePopup(); addRulerPoint([S[k][1], S[k][2]]); } }
 function styleSel(k) { const sl = siteLayers[k]; if (!sl) return; const on = selected.has(k); sl.wedges.forEach(p => p.setStyle(on ? {color:'#f59e0b', weight:3} : {color:'#000', weight:1})); }
 function toggleSel(k) { selected.has(k) ? selected.delete(k) : selected.add(k); styleSel(k); updateSelBar(); }
 function updateSelBar() { $('selN').textContent = selected.size + ' selected'; $('selbar').style.display = (selMode || selected.size) ? 'flex' : 'none'; }
-function selectVisible() { if (!cur) return; const b = map.getBounds(); let n = 0; cur.draw.forEach(k => { const r = cur.role[k] || 'other'; if ((r === 'other' && !$('vOther').checked) || (r === 'missing' && !$('vMiss').checked)) return; if (b.contains([S[k][1], S[k][2]])) { selected.add(k); styleSel(k); n++; } }); updateSelBar(); toast(n + ' visible selected'); }
+function selectVisible() { if (!cur) return; const b = map.getBounds(); let n = 0; cur.draw.forEach(k => { const r = cur.role[k] || 'other'; if ((r === 'other' && !$('vOther').checked) || (r === 'missing' && !$('vMiss').checked)) return; if (b.contains([S[k][1], S[k][2]])) { selected.add(k); styleSel(k); n++; } }); updateSelBar(); toast(n + ' visible site(s) selected'); }
 function clearSel() { const old = Array.from(selected); selected.clear(); old.forEach(styleSel); updateSelBar(); }
 $('selVis').addEventListener('click', selectVisible); $('selClr').addEventListener('click', clearSel);
-const SEL_HDR = ['USID','Site_Name','Latitude','Longitude','Role','HO_ATT','Pct_Sharing','Dist_mi','Dist_km'];
+
+const SEL_HDR = ['USID','Site_Name','Latitude','Longitude','Role','HO_ATT','Pct_Sharing','Dist_from_source_mi','Dist_from_source_km'];
 function selRows() { return Array.from(selected).sort().map(k => { const s = S[k], n = cur && cur.NB[k]; const role = cur && k === cur.src ? 'Source' : n ? STAT[n.st][0] : 'Other'; const d = cur && cur.dist[k] != null ? cur.dist[k] : null; return [k, s[0], s[1], s[2], role, n ? n.ho : '', n ? n.pct : '', d != null ? d.toFixed(2) : '', d != null ? (d*1.609344).toFixed(2) : '']; }); }
 function selText(kind) { const rows = selRows(), q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; if (kind === 'usid') return rows.map(r => r[0]).join('\n'); if (kind === 'csv') return [SEL_HDR].concat(rows).map(r => r.map(q).join(',')).join('\n'); return [SEL_HDR].concat(rows).map(r => r.map(v => v == null ? '' : v).join('\t')).join('\n'); }
 function downloadText(text, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type:'text/csv'})); a.download = name; a.click(); }
 function openModal() { if (!selected.size) { toast('No sites selected'); return; } $('mdl').style.display = 'flex'; showFmt(fmtKind); }
 function showFmt(kind) { fmtKind = kind; $('mTa').value = selText(kind); $('mN').textContent = selected.size + ' site(s)'; document.querySelectorAll('.fm button').forEach(b => b.classList.toggle('on', b.dataset.f === kind)); }
-function copyText(text) { const done = () => toast('Copied to clipboard'); const fallback = () => { const ta = $('mTa'); ta.value = text; ta.select(); document.execCommand('copy'); done(); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback(); }
+function copyText(text) { const done = () => toast('Copied ' + selected.size + ' site(s) to clipboard'); const fallback = () => { const ta = $('mTa'); ta.value = text; ta.select(); document.execCommand('copy'); done(); }; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback); else fallback(); }
 $('selCopy').addEventListener('click', openModal); $('selCsv').addEventListener('click', () => { if (!selected.size) { toast('No sites selected'); return; } downloadText(selText('csv'), 'selected_sites.csv'); });
 $('mX').addEventListener('click', () => $('mdl').style.display = 'none'); $('mdl').addEventListener('click', e => { if (e.target === $('mdl')) $('mdl').style.display = 'none'; });
 document.querySelector('.fm').addEventListener('click', e => { if (e.target.dataset.f) showFmt(e.target.dataset.f); });
 $('mCopy').addEventListener('click', () => copyText(selText(fmtKind))); $('mDl').addEventListener('click', () => downloadText(selText('csv'), 'selected_sites.csv'));
+
 const dtxt = mi => (mi*1.609344).toFixed(2) + ' km / ' + mi.toFixed(2) + ' mi';
-function drawRuler() { rLayer.clearLayers(); rLine.setLatLngs(rPts); rLayer.addLayer(rLine); let cum = 0, last = 0; rPts.forEach((p, i) => { if (i > 0) { last = hav(rPts[i-1][0], rPts[i-1][1], p[0], p[1]); cum += last; } const m = L.circleMarker(p, {radius:4, color:'#f87171', fillColor:'#fff', fillOpacity:1, weight:2, interactive:false}); if (i > 0) m.bindTooltip(dtxt(cum), {permanent:true, direction:'top', offset:[0, -6], className:'rtip'}); rLayer.addLayer(m); }); $('rTot').textContent = 'Total: ' + dtxt(cum); $('rSeg').textContent = rPts.length > 1 ? 'Last: ' + dtxt(last) + ' | ' + rPts.length + ' pts' : (rPts.length ? '1 point' : ''); }
+function drawRuler() { rLayer.clearLayers(); rLine.setLatLngs(rPts); rLayer.addLayer(rLine); let cum = 0, last = 0; rPts.forEach((p, i) => { if (i > 0) { last = hav(rPts[i-1][0], rPts[i-1][1], p[0], p[1]); cum += last; } const m = L.circleMarker(p, {radius:4, color:'#f87171', fillColor:'#fff', fillOpacity:1, weight:2, interactive:false}); if (i > 0) m.bindTooltip(dtxt(cum), {permanent:true, direction:'top', offset:[0, -6], className:'rtip'}); rLayer.addLayer(m); }); $('rTot').textContent = 'Total: ' + dtxt(cum); $('rSeg').textContent = rPts.length > 1 ? 'Last segment: ' + dtxt(last) + ' | ' + rPts.length + ' points' : (rPts.length ? '1 point - click next point' : ''); $('rbox').style.display = (rulerOn || rPts.length) ? 'block' : 'none'; }
 function addRulerPoint(ll) { rPts.push(ll); drawRuler(); }
 map.on('click', e => { if (rulerOn) addRulerPoint([e.latlng.lat, e.latlng.lng]); });
 $('rUndo').addEventListener('click', () => { rPts.pop(); drawRuler(); }); $('rClr').addEventListener('click', () => { rPts = []; drawRuler(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !(e.target.tagName === 'INPUT')) { setMode(null); $('mdl').style.display = 'none'; } });
-(function init() { if (ALL.length) { const b = L.latLngBounds(ALL.map(k => [S[k][1], S[k][2]])); map.fitBounds(b); } })();
+
+(function init() {
+  const hash = decodeURIComponent(location.hash.slice(1)).toUpperCase();
+  const start = S[hash] ? hash : (CFG.default && S[CFG.default] ? CFG.default : null);
+  if (start) loadSource(start);
+  else if (ALL.length) { const b = L.latLngBounds(ALL.map(k => [S[k][1], S[k][2]])); map.fitBounds(b); }
+})();
+
+// ── KEY FIX: Dynamically resize the parent Streamlit iframe to fill viewport ──
+(function resizeIframe() {
+  if (window.parent !== window) {
+    try {
+      const iframes = window.parent.document.querySelectorAll('iframe[srcdoc], iframe[data-testid="stHtml"]');
+      for (const iframe of iframes) {
+        if (iframe.contentWindow === window) {
+          iframe.style.height = window.innerHeight + 'px';
+          iframe.style.width = '100%';
+          break;
+        }
+      }
+    } catch(e) {}
+  }
+  window.addEventListener('resize', resizeIframe);
+})();
 </script></body></html>"""
-            
-            final_html = HTML.replace("__DATA__", data)
-            components.html(final_html, height=850, scrolling=False)
-            
-        except Exception as e:
-            st.error(f"Error: {e}")
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+
+        final_html = HTML.replace("__DATA__", data)
+        components.html(final_html, height=900, scrolling=False)
+
+    except Exception as e:
+        st.error(f"Error processing files: {e}")
 else:
-    st.markdown('<div class="map-wrapper" style="display: flex; align-items: center; justify-content: center; background: #0a0e1a;">', unsafe_allow_html=True)
     st.markdown("""
-    <div style="text-align: center; color: #64748b; padding: 40px;">
-        <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;">📁</div>
-        <h3 style="color: #94a3b8; margin-bottom: 8px; font-weight: 500;">Upload both files to generate the interactive map</h3>
-        <p style="font-size: 12px; line-height: 1.6; color: #64748b;">
-            1. <b style="color:#8b95a5">Site Data</b> (CSV) - USID, coordinates, azimuth, cell info<br>
-            2. <b style="color:#8b95a5">SQL Table</b> (Excel/CSV) - Neighbor relationships and HO data
-        </p>
+    <div style="display:flex;align-items:center;justify-content:center;height:calc(100vh - 100px);background:#0a0e1a;color:#64748b;text-align:center;padding:40px">
+        <div>
+            <div style="font-size:48px;margin-bottom:16px">📁</div>
+            <h3 style="color:#94a3b8;margin-bottom:8px;font-size:18px">Upload both files to generate the interactive map</h3>
+            <p style="font-size:12px;line-height:1.6">
+                1. <b>Site Data</b> (CSV) — USID, coordinates, azimuth, cell info<br>
+                2. <b>SQL Table</b> (Excel/CSV) — Neighbor relationships and HO data
+            </p>
+        </div>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
