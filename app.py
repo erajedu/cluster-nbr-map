@@ -16,7 +16,7 @@ st.set_page_config(
 st.markdown("""
 <style>
     /* Remove default Streamlit padding and margins */
-    .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+    .block-container { padding: 0 !important; max-width: 100% !important; }
     .stApp { background: #0f172a !important; }
     
     /* Hide Streamlit menu and footer */
@@ -24,89 +24,55 @@ st.markdown("""
     footer { visibility: hidden; }
     .stDecoration { display: none !important; }
     
-    /* Slim uploaders */
+    /* Hide all default Streamlit elements except what we need */
     .stFileUploader { margin: 0 !important; padding: 0 !important; }
-    .stFileUploader > div { background: #1e293b !important; border: 1px solid #334155 !important; border-radius: 6px !important; padding: 8px 12px !important; }
-    .stFileUploader label { font-size: 11px !important; color: #94a3b8 !important; margin-bottom: 4px !important; }
-    .stFileUploader [data-testid="stFileUploaderDropzone"] { min-height: 40px !important; padding: 6px !important; }
+    .stFileUploader > div { background: transparent !important; border: none !important; padding: 0 !important; }
+    .stFileUploader label { display: none !important; }
+    .stFileUploader [data-testid="stFileUploaderDropzone"] { 
+        min-height: 28px !important; 
+        padding: 2px 8px !important;
+        background: rgba(255,255,255,0.1) !important;
+        border: 1px solid rgba(255,255,255,0.2) !important;
+        border-radius: 4px !important;
+        cursor: pointer !important;
+    }
+    .stFileUploader [data-testid="stFileUploaderDropzone"]:hover {
+        background: rgba(255,255,255,0.15) !important;
+        border-color: rgba(255,255,255,0.4) !important;
+    }
+    .stFileUploader [data-testid="stFileUploaderDropzone"] p { 
+        color: white !important; 
+        font-size: 11px !important; 
+        margin: 0 !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Hide Streamlit uploader default labels and extra elements */
+    .stFileUploader > label { display: none !important; }
+    .stFileUploader [data-testid="stFileUploaderInstruction"] { display: none !important; }
+    .stFileUploader [data-testid="stFileUploaderDropzoneInstructions"] { display: none !important; }
     
     /* Compact columns */
-    .stColumn { padding: 0 4px !important; }
-    
-    /* Hide Streamlit title default styling */
-    h1 { margin: 0 !important; padding: 0 !important; font-size: 0 !important; }
-    .stMarkdown h1 { display: none !important; }
+    .stColumn { padding: 0 2px !important; }
     
     /* Remove extra spacing */
-    .element-container { margin-bottom: 0.2rem !important; }
+    .element-container { margin-bottom: 0 !important; }
     div[data-testid="stVerticalBlock"] > div { margin-bottom: 0 !important; }
+    div[data-testid="stVerticalBlock"] { gap: 0 !important; }
     
-    /* Custom header bar */
-    .custom-header {
-        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-        color: white;
-        padding: 8px 20px;
-        font-size: 16px;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        border-radius: 6px 6px 0 0;
-        margin-bottom: 0;
-    }
-    .custom-header .subtitle { font-size: 11px; opacity: 0.85; font-weight: 400; }
-    
-    /* Upload bar */
-    .upload-bar {
-        background: #1e293b;
-        border: 1px solid #334155;
-        border-top: none;
-        padding: 8px 16px;
-        display: flex;
-        gap: 12px;
-        align-items: center;
-        border-radius: 0 0 6px 6px;
-        margin-bottom: 0;
-    }
-    .upload-bar .upload-label {
-        color: #94a3b8;
-        font-size: 11px;
-        font-weight: 500;
-        margin-right: 4px;
-    }
-    .upload-bar .upload-item {
-        flex: 1;
-    }
-    .upload-bar .status {
-        color: #10b981;
-        font-size: 11px;
-        font-weight: 500;
-        padding: 4px 10px;
-        background: rgba(16, 185, 129, 0.1);
-        border: 1px solid rgba(16, 185, 129, 0.3);
-        border-radius: 4px;
-        white-space: nowrap;
-    }
-    .upload-bar .status.error {
-        color: #ef4444;
-        background: rgba(239, 68, 68, 0.1);
-        border-color: rgba(239, 68, 68, 0.3);
-    }
-    
-    /* Map container */
-    .map-container {
-        border: 1px solid #334155;
-        border-radius: 6px;
+    /* Map container takes full remaining height */
+    .map-wrapper {
+        height: calc(100vh - 48px);
+        width: 100%;
         overflow: hidden;
-        margin-top: 0;
     }
     
-    /* Hide Streamlit uploader default labels */
-    .stFileUploader > label { display: none !important; }
+    /* Hide Streamlit spinner overlay styling issues */
+    .stSpinner { position: absolute !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ───────────────────────── CONFIG & HELPERS ─────────────────────────
+# ───────────────────────── CONFIG & HELPERS ────────────────────────
 MAX_DISTANCE_MILES = 25.0
 BUFFER_MILES = 1.8
 CLOSEST_N = 15
@@ -189,55 +155,70 @@ def build_payload(df, tbl):
 
 # ───────────────────────── STREAMLIT UI ─────────────────────────
 
-# Custom unified header
+# Custom unified header with integrated uploaders
 st.markdown("""
-<div class="custom-header">
-    <div>🗺️ Cluster Neighbor Visualization Tool</div>
-    <div class="subtitle">@Rajesh Dubey | rajesh.dubey@sds.com</div>
+<div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); 
+            padding: 8px 16px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between;
+            height: 48px;
+            box-sizing: border-box;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 20px;">🗺️</span>
+        <span style="color: white; font-size: 15px; font-weight: 600;">Cluster Neighbor Visualization Tool</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="color: rgba(255,255,255,0.7); font-size: 11px;">@Rajesh Dubey | rajesh.dubey@sds.com</span>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
-# Slim upload bar
+# Uploaders row (compact, integrated)
 site_file = None
 nbr_file = None
 
 with st.container():
-    st.markdown('<div class="upload-bar">', unsafe_allow_html=True)
+    st.markdown('<div style="background: #1e293b; border-bottom: 1px solid #334155; padding: 6px 16px; display: flex; align-items: center; gap: 12px; height: 40px; box-sizing: border-box;">', unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1, 1, 0.3], gap="small")
+    col1, col2, col3, col4 = st.columns([0.3, 0.3, 0.2, 0.2], gap="small")
     
     with col1:
+        st.markdown('<span style="color: #94a3b8; font-size: 11px; font-weight: 500;">📁 Site Data:</span>', unsafe_allow_html=True)
         site_file = st.file_uploader("", type=["csv"], key="site", label_visibility="collapsed")
     
     with col2:
+        st.markdown('<span style="color: #94a3b8; font-size: 11px; font-weight: 500;">📊 SQL Table:</span>', unsafe_allow_html=True)
         nbr_file = st.file_uploader("", type=["xlsx", "xls", "csv"], key="nbr", label_visibility="collapsed")
     
     with col3:
         if site_file and nbr_file:
-            st.markdown('<div class="status">✓ Files Loaded</div>', unsafe_allow_html=True)
+            st.markdown('<span style="color: #10b981; font-size: 11px; font-weight: 600;">✓ Both files loaded</span>', unsafe_allow_html=True)
         else:
-            st.markdown('<div class="status error">Upload both files</div>', unsafe_allow_html=True)
+            st.markdown('<span style="color: #f59e0b; font-size: 11px;">⚠ Upload both files</span>', unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown('', unsafe_allow_html=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Map container
+# Map container - takes full remaining height
 if site_file and nbr_file:
-    with st.container():
-        st.markdown('<div class="map-container">', unsafe_allow_html=True)
-        
-        with st.spinner("Processing data..."):
-            try:
-                site_df = pd.read_csv(site_file, low_memory=False)
-                if nbr_file.name.lower().endswith('.csv'):
-                    nbr_df = pd.read_csv(nbr_file, low_memory=False)
-                else:
-                    nbr_df = pd.read_excel(nbr_file)
-                
-                payload = build_payload(site_df, nbr_df)
-                data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
-                
-                # The HTML Template (compact, professional dark theme)
-                HTML = r"""<!DOCTYPE html>
+    st.markdown('<div class="map-wrapper">', unsafe_allow_html=True)
+    
+    with st.spinner("Processing data..."):
+        try:
+            site_df = pd.read_csv(site_file, low_memory=False)
+            if nbr_file.name.lower().endswith('.csv'):
+                nbr_df = pd.read_csv(nbr_file, low_memory=False)
+            else:
+                nbr_df = pd.read_excel(nbr_file)
+            
+            payload = build_payload(site_df, nbr_df)
+            data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+            
+            # The HTML Template (compact, professional dark theme)
+            HTML = r"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>Cluster NBR Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -494,17 +475,24 @@ $('rUndo').addEventListener('click', () => { rPts.pop(); drawRuler(); }); $('rCl
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !(e.target.tagName === 'INPUT')) { setMode(null); $('mdl').style.display = 'none'; } });
 (function init() { if (ALL.length) { const b = L.latLngBounds(ALL.map(k => [S[k][1], S[k][2]])); map.fitBounds(b); } })();
 </script></body></html>"""
-                
-                final_html = HTML.replace("__DATA__", data)
-                components.html(final_html, height=850, scrolling=False)
-                
-            except Exception as e:
-                st.error(f"Error: {e}")
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+            
+            final_html = HTML.replace("__DATA__", data)
+            components.html(final_html, height=850, scrolling=False)
+            
+        except Exception as e:
+            st.error(f"Error: {e}")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 else:
-    with st.container():
-        st.markdown('<div class="map-container" style="padding:40px;text-align:center;color:#64748b">', unsafe_allow_html=True)
-        st.markdown("### 📁 Upload both files to generate the interactive map")
-        st.markdown("1. **Site Data** (CSV) - Contains USID, coordinates, azimuth, cell info<br>2. **SQL Table** (Excel/CSV) - Contains neighbor relationships and HO data")
-        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="map-wrapper" style="display: flex; align-items: center; justify-content: center; background: #0f172a;">', unsafe_allow_html=True)
+    st.markdown("""
+    <div style="text-align: center; color: #64748b; padding: 40px;">
+        <div style="font-size: 48px; margin-bottom: 16px;">📁</div>
+        <h3 style="color: #94a3b8; margin-bottom: 8px;">Upload both files to generate the interactive map</h3>
+        <p style="font-size: 13px; line-height: 1.6;">
+            1. <b>Site Data</b> (CSV) - Contains USID, coordinates, azimuth, cell info<br>
+            2. <b>SQL Table</b> (Excel/CSV) - Contains neighbor relationships and HO data
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
