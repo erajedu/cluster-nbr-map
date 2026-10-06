@@ -5,7 +5,106 @@ import math
 import json
 import streamlit.components.v1 as components
 
-st.set_page_config(layout="wide", page_title="Cluster NBR Map", page_icon="️")
+st.set_page_config(
+    layout="wide",
+    page_title="Cluster NBR Map",
+    page_icon="🗺️",
+    initial_sidebar_state="collapsed"
+)
+
+# Inject custom CSS to minimize Streamlit chrome and unify the look
+st.markdown("""
+<style>
+    /* Remove default Streamlit padding and margins */
+    .block-container { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+    .stApp { background: #0f172a !important; }
+    
+    /* Hide Streamlit menu and footer */
+    #MainMenu { visibility: hidden; }
+    footer { visibility: hidden; }
+    .stDecoration { display: none !important; }
+    
+    /* Slim uploaders */
+    .stFileUploader { margin: 0 !important; padding: 0 !important; }
+    .stFileUploader > div { background: #1e293b !important; border: 1px solid #334155 !important; border-radius: 6px !important; padding: 8px 12px !important; }
+    .stFileUploader label { font-size: 11px !important; color: #94a3b8 !important; margin-bottom: 4px !important; }
+    .stFileUploader [data-testid="stFileUploaderDropzone"] { min-height: 40px !important; padding: 6px !important; }
+    
+    /* Compact columns */
+    .stColumn { padding: 0 4px !important; }
+    
+    /* Hide Streamlit title default styling */
+    h1 { margin: 0 !important; padding: 0 !important; font-size: 0 !important; }
+    .stMarkdown h1 { display: none !important; }
+    
+    /* Remove extra spacing */
+    .element-container { margin-bottom: 0.2rem !important; }
+    div[data-testid="stVerticalBlock"] > div { margin-bottom: 0 !important; }
+    
+    /* Custom header bar */
+    .custom-header {
+        background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        color: white;
+        padding: 8px 20px;
+        font-size: 16px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-radius: 6px 6px 0 0;
+        margin-bottom: 0;
+    }
+    .custom-header .subtitle { font-size: 11px; opacity: 0.85; font-weight: 400; }
+    
+    /* Upload bar */
+    .upload-bar {
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-top: none;
+        padding: 8px 16px;
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        border-radius: 0 0 6px 6px;
+        margin-bottom: 0;
+    }
+    .upload-bar .upload-label {
+        color: #94a3b8;
+        font-size: 11px;
+        font-weight: 500;
+        margin-right: 4px;
+    }
+    .upload-bar .upload-item {
+        flex: 1;
+    }
+    .upload-bar .status {
+        color: #10b981;
+        font-size: 11px;
+        font-weight: 500;
+        padding: 4px 10px;
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+        border-radius: 4px;
+        white-space: nowrap;
+    }
+    .upload-bar .status.error {
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.1);
+        border-color: rgba(239, 68, 68, 0.3);
+    }
+    
+    /* Map container */
+    .map-container {
+        border: 1px solid #334155;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-top: 0;
+    }
+    
+    /* Hide Streamlit uploader default labels */
+    .stFileUploader > label { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
 
 # ───────────────────────── CONFIG & HELPERS ─────────────────────────
 MAX_DISTANCE_MILES = 25.0
@@ -89,131 +188,156 @@ def build_payload(df, tbl):
             "sites": site_json, "nbr": nbr_json}
 
 # ───────────────────────── STREAMLIT UI ─────────────────────────
-st.title("🗺️ Cluster Neighbor Visualization Tool")
-st.markdown("Upload your data files below to generate the interactive map.")
 
-col1, col2 = st.columns(2)
-with col1:
-    site_file = st.file_uploader("1. Upload Site Data (CSV)", type=["csv"])
-with col2:
-    nbr_file = st.file_uploader("2. Upload SQL Table (Excel/CSV)", type=["xlsx", "xls", "csv"])
+# Custom unified header
+st.markdown("""
+<div class="custom-header">
+    <div>🗺️ Cluster Neighbor Visualization Tool</div>
+    <div class="subtitle">@Rajesh Dubey | rajesh.dubey@sds.com</div>
+</div>
+""", unsafe_allow_html=True)
 
+# Slim upload bar
+site_file = None
+nbr_file = None
+
+with st.container():
+    st.markdown('<div class="upload-bar">', unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 1, 0.3], gap="small")
+    
+    with col1:
+        site_file = st.file_uploader("", type=["csv"], key="site", label_visibility="collapsed")
+    
+    with col2:
+        nbr_file = st.file_uploader("", type=["xlsx", "xls", "csv"], key="nbr", label_visibility="collapsed")
+    
+    with col3:
+        if site_file and nbr_file:
+            st.markdown('<div class="status">✓ Files Loaded</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="status error">Upload both files</div>', unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# Map container
 if site_file and nbr_file:
-    with st.spinner("Processing data and generating map..."):
-        try:
-            site_df = pd.read_csv(site_file, low_memory=False)
-            if nbr_file.name.lower().endswith('.csv'):
-                nbr_df = pd.read_csv(nbr_file, low_memory=False)
-            else:
-                nbr_df = pd.read_excel(nbr_file)
-            
-            payload = build_payload(site_df, nbr_df)
-            data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
-            
-            # The HTML Template (Identical to the working dark-theme version)
-            HTML = r"""<!DOCTYPE html>
+    with st.container():
+        st.markdown('<div class="map-container">', unsafe_allow_html=True)
+        
+        with st.spinner("Processing data..."):
+            try:
+                site_df = pd.read_csv(site_file, low_memory=False)
+                if nbr_file.name.lower().endswith('.csv'):
+                    nbr_df = pd.read_csv(nbr_file, low_memory=False)
+                else:
+                    nbr_df = pd.read_excel(nbr_file)
+                
+                payload = build_payload(site_df, nbr_df)
+                data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+                
+                # The HTML Template (compact, professional dark theme)
+                HTML = r"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>Cluster NBR Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 html,body{margin:0;height:100%;font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;color:#e2e8f0;background:#0f172a}
-#app{display:flex;flex-direction:column;height:100%}
-#hdr{background:linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);color:#fff;font-size:18px;font-weight:600;padding:12px 24px;width:100%;box-sizing:border-box;flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
-#ftr{background:#1e293b;color:#94a3b8;font-size:11px;padding:8px 24px;width:100%;box-sizing:border-box;flex-shrink:0;border-top:1px solid #334155}
-#ftr a{color:#818cf8;text-decoration:none}
+#app{display:flex;flex-direction:column;height:100vh}
 #wrap{display:flex;flex:1;min-height:0;overflow:hidden}
-#side{width:360px;min-width:360px;overflow-y:auto;background:#1e293b;border-right:1px solid #334155;padding:16px;box-sizing:border-box}
+#side{width:340px;min-width:340px;overflow-y:auto;background:#1e293b;border-right:1px solid #334155;padding:12px;box-sizing:border-box}
 #mapbox{flex:1;position:relative;background:#020617;min-width:0}
 #map{height:100%;width:100%;--fs:13px}
-h4{margin:18px 0 8px;padding-bottom:6px;border-bottom:1px solid #334155;font-size:12px;color:#818cf8;font-weight:600;text-transform:uppercase}
-.ttl{font-size:16px;font-weight:700;color:#f87171;margin-top:10px}.sub{color:#94a3b8;margin-top:2px;font-size:11px}.hint{font-size:10px;color:#64748b}
-label{display:flex;align-items:center;gap:6px;margin:6px 0;cursor:pointer;color:#cbd5e1;font-size:12px}
-input[type=range]{width:100%;accent-color:#6366f1}
-.box{background:#0f172a;border-radius:6px;padding:10px;margin:8px 0;border:1px solid #334155}
-.row{display:flex;justify-content:space-between;align-items:center;margin:8px 0;gap:8px}
-button{cursor:pointer;border:1px solid #334155;background:#334155;color:#e2e8f0;border-radius:4px;padding:6px 12px;font-size:11px;font-weight:500}
+h4{margin:14px 0 6px;padding-bottom:5px;border-bottom:1px solid #334155;font-size:11px;color:#818cf8;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+.ttl{font-size:15px;font-weight:700;color:#f87171;margin-top:8px}.sub{color:#94a3b8;margin-top:2px;font-size:11px}.hint{font-size:10px;color:#64748b}
+label{display:flex;align-items:center;gap:6px;margin:5px 0;cursor:pointer;color:#cbd5e1;font-size:12px}
+input[type=range]{width:100%;accent-color:#6366f1;height:4px}
+.box{background:#0f172a;border-radius:5px;padding:8px;margin:6px 0;border:1px solid #334155}
+.row{display:flex;justify-content:space-between;align-items:center;margin:6px 0;gap:6px}
+button{cursor:pointer;border:1px solid #334155;background:#334155;color:#e2e8f0;border-radius:4px;padding:5px 10px;font-size:11px;font-weight:500;transition:all 0.2s}
 button:hover{background:#4f46e5;border-color:#4f46e5;color:#fff}
 button.on{background:#4f46e5;color:#fff;border-color:#4f46e5}
-.srch{position:relative;margin-bottom:16px}
-#q{width:100%;box-sizing:border-box;padding:10px 12px;font-size:13px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#e2e8f0;outline:none}
-#ac{position:absolute;top:100%;left:0;right:0;background:#1e293b;border:1px solid #334155;border-radius:6px;max-height:260px;overflow-y:auto;z-index:2000;display:none}
-.ai{padding:8px 12px;cursor:pointer;display:flex;gap:8px;align-items:center;border-bottom:1px solid #0f172a}
+.srch{position:relative;margin-bottom:12px}
+#q{width:100%;box-sizing:border-box;padding:8px 10px;font-size:12px;background:#0f172a;border:1px solid #334155;border-radius:5px;color:#e2e8f0;outline:none}
+#q:focus{border-color:#6366f1}
+#ac{position:absolute;top:100%;left:0;right:0;background:#1e293b;border:1px solid #334155;border-radius:5px;max-height:240px;overflow-y:auto;z-index:2000;display:none}
+.ai{padding:7px 10px;cursor:pointer;display:flex;gap:8px;align-items:center;border-bottom:1px solid #0f172a}
 .ai:hover,.ai.sel{background:#334155}.ai b{color:#818cf8}.ai span{flex:1;color:#94a3b8;font-size:11px}
-.stat{display:flex;gap:6px;margin-bottom:10px}.stat div{flex:1;background:#0f172a;border:1px solid #334155;border-radius:6px;padding:8px 4px;text-align:center}
-.stat b{display:block;font-size:16px;color:#818cf8}
-.pills{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}.pills button{border-radius:12px;padding:4px 10px;font-size:10px}
-.nb{border:1px solid #334155;border-radius:6px;padding:8px;margin:6px 0;cursor:pointer;background:#0f172a}
+.stat{display:flex;gap:5px;margin-bottom:8px}.stat div{flex:1;background:#0f172a;border:1px solid #334155;border-radius:5px;padding:6px 4px;text-align:center}
+.stat b{display:block;font-size:15px;color:#818cf8}
+.pills{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px}.pills button{border-radius:11px;padding:3px 9px;font-size:10px}
+.nb{border:1px solid #334155;border-radius:5px;padding:7px;margin:5px 0;cursor:pointer;background:#0f172a}
 .nb:hover{background:#1e293b;border-color:#6366f1}
-.nbt{display:flex;align-items:center;gap:6px}.nbt .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#94a3b8;font-size:11px}
-.bd{color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;white-space:nowrap;font-weight:600}.meta{font-size:10px;color:#64748b;margin:4px 0 0 24px}
-.lg{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:11px;color:#cbd5e1}.sw{width:14px;height:14px;border-radius:3px;display:inline-block}
+.nbt{display:flex;align-items:center;gap:5px}.nbt .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#94a3b8;font-size:11px}
+.bd{color:#fff;font-size:10px;padding:2px 7px;border-radius:9px;white-space:nowrap;font-weight:600}.meta{font-size:10px;color:#64748b;margin:3px 0 0 22px}
+.lg{display:flex;align-items:center;gap:7px;margin:3px 0;font-size:11px;color:#cbd5e1}.sw{width:13px;height:13px;border-radius:3px;display:inline-block}
 .lbl{font-weight:600;font-size:var(--fs);white-space:nowrap;text-shadow:1px 1px 3px #000,-1px -1px 3px #000}
 .lbl-source{font-size:calc(var(--fs) + 2px)}.lbl-other{display:none}.zhi .lbl-other{display:block}.nolbl .lbl{display:none!important}
 .vh{width:10px;height:10px;background:#fff;border:2px solid #6366f1;border-radius:50%;cursor:move}
-#mbtn{position:absolute;top:10px;left:10px;z-index:1000;display:flex;gap:6px}
-.mb{background:#1e293b;color:#e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.4);border:1px solid #334155;padding:8px 12px;font-size:12px;border-radius:6px}
+#mbtn{position:absolute;top:8px;left:8px;z-index:1000;display:flex;gap:5px}
+.mb{background:#1e293b;color:#e2e8f0;box-shadow:0 2px 6px rgba(0,0,0,0.4);border:1px solid #334155;padding:6px 10px;font-size:11px;border-radius:5px}
 .mb:hover{background:#334155;color:#fff}.mb.on{background:#4f46e5;color:#fff;border-color:#4f46e5}
 .crosshair,.crosshair.leaflet-grab{cursor:crosshair!important}
-#selbar{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid #334155;border-radius:8px;padding:10px 14px;z-index:1000;display:none;align-items:center;gap:10px}
-#selN{font-weight:bold;color:#f59e0b;min-width:80px}
-#rbox{position:absolute;top:10px;right:10px;background:#1e293b;border:1px solid #334155;border-radius:8px;padding:12px 14px;z-index:1000;display:none;min-width:260px}
-.rtip{background:#1e293b;border:1px solid #f87171;color:#f87171;font-weight:bold;font-size:11px;padding:2px 6px;border-radius:4px}
+#selbar{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid #334155;border-radius:6px;padding:8px 12px;z-index:1000;display:none;align-items:center;gap:8px}
+#selN{font-weight:bold;color:#f59e0b;min-width:70px;font-size:11px}
+#rbox{position:absolute;top:8px;right:8px;background:#1e293b;border:1px solid #334155;border-radius:6px;padding:10px 12px;z-index:1000;display:none;min-width:240px}
+.rtip{background:#1e293b;border:1px solid #f87171;color:#f87171;font-weight:bold;font-size:11px;padding:2px 5px;border-radius:3px}
 #mdl{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:5000;display:none;align-items:center;justify-content:center}
-.mbox{background:#1e293b;border-radius:10px;width:560px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;border:1px solid #334155}
-.mh,.fm,.mf{padding:14px 18px;display:flex;align-items:center;gap:10px}.mh{justify-content:space-between;border-bottom:1px solid #0f172a;font-size:14px;color:#818cf8;font-weight:600}
-.fm button.on{background:#4f46e5;color:#fff;border-color:#4f46e5}.mf{border-top:1px solid #0f172a}.mf span{flex:1;color:#94a3b8;font-size:12px}
-#mTa{margin:0 18px;height:260px;font-family:Consolas,monospace;font-size:11px;resize:none;box-sizing:border-box;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:10px}
-#toast{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);background:#10b981;color:#fff;padding:10px 20px;border-radius:6px;z-index:1000;display:none;max-width:70%;font-weight:500}
-.warn{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;border-radius:6px;padding:8px 10px;margin-top:8px;font-size:11px}
-select{width:100%;font-size:11px;padding:6px 8px;margin:4px 0;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:4px}
-input[type="color"]{width:40px;height:28px;border:1px solid #334155;border-radius:4px;background:#0f172a;cursor:pointer}
+.mbox{background:#1e293b;border-radius:8px;width:540px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;border:1px solid #334155}
+.mh,.fm,.mf{padding:12px 16px;display:flex;align-items:center;gap:8px}.mh{justify-content:space-between;border-bottom:1px solid #0f172a;font-size:13px;color:#818cf8;font-weight:600}
+.fm button.on{background:#4f46e5;color:#fff;border-color:#4f46e5}.mf{border-top:1px solid #0f172a}.mf span{flex:1;color:#94a3b8;font-size:11px}
+#mTa{margin:0 16px;height:240px;font-family:Consolas,monospace;font-size:11px;resize:none;box-sizing:border-box;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:5px;padding:8px}
+#toast{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#10b981;color:#fff;padding:8px 16px;border-radius:5px;z-index:1000;display:none;max-width:70%;font-weight:500;font-size:12px}
+.warn{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#fca5a5;border-radius:5px;padding:6px 8px;margin-top:6px;font-size:11px}
+select{width:100%;font-size:11px;padding:5px 7px;margin:3px 0;background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:4px}
+input[type="color"]{width:36px;height:26px;border:1px solid #334155;border-radius:4px;background:#0f172a;cursor:pointer}
+#side::-webkit-scrollbar{width:5px}#side::-webkit-scrollbar-track{background:#0f172a}#side::-webkit-scrollbar-thumb{background:#4f46e5;border-radius:3px}
 </style></head><body>
 <div id="app">
-<div id="hdr"><span>Cluster Neighbor Visualization Tool</span></div>
 <div id="wrap">
 <div id="side">
-  <div style="font-weight:600;font-size:13px;margin-bottom:8px;color:#818cf8;text-transform:uppercase">Provide USID</div>
-  <div class="srch"><input id="q" placeholder="Provide USID (or site name)" autocomplete="off"><div id="ac"></div></div>
-  <div id="empty" class="hint" style="margin-top:10px">Type a USID / site name above, or click any site on the map.</div>
+  <div style="font-weight:600;font-size:12px;margin-bottom:6px;color:#818cf8;text-transform:uppercase;letter-spacing:0.5px">Provide USID</div>
+  <div class="srch"><input id="q" placeholder="Enter USID or site name" autocomplete="off"><div id="ac"></div></div>
+  <div id="empty" class="hint" style="margin-top:8px">Type a USID above, or click any site on the map.</div>
   <div id="panel" style="display:none">
   <div class="ttl" id="tSrc"></div><div class="sub" id="tSub"></div><div class="hint" id="tInfo"></div>
   <h4>Polygon Controls</h4>
-  <label><input type="checkbox" id="chkShow" checked> <b>Show polygon boundary</b></label>
-  <div class="box"><label><input type="checkbox" id="chkEdit"> <b style="color:#818cf8">Enable polygon editing</b></label><div class="hint">Drag handles, click line to add, right-click to delete</div></div>
-  <label>Buffer: <b id="bufVal"></b> miles</label><input type="range" id="buf" min="0" max="6" step="0.1">
-  <label>Line thickness: <b id="wVal">3</b>px</label><input type="range" id="pw" min="1" max="10" step="1" value="3">
+  <label><input type="checkbox" id="chkShow" checked> <b>Show polygon</b></label>
+  <div class="box"><label><input type="checkbox" id="chkEdit"> <b style="color:#818cf8">Enable editing</b></label><div class="hint">Drag handles, click line to add, right-click to delete</div></div>
+  <label>Buffer: <b id="bufVal"></b> mi</label><input type="range" id="buf" min="0" max="6" step="0.1">
+  <label>Line: <b id="wVal">3</b>px</label><input type="range" id="pw" min="1" max="10" step="1" value="3">
   <select id="ps"><option value="" selected>Solid</option><option value="6, 6">Dashed</option><option value="2, 4">Dotted</option></select>
-  <div class="row"><span>Line colour</span><input type="color" id="pc" value="#818cf8"></div>
-  <label>Keep these sites OUTSIDE:</label>
-  <select id="excl"><option value="missing" selected>Missing / suggested sites</option><option value="all">All non-defined sites</option><option value="none">None</option></select>
+  <div class="row"><span>Colour</span><input type="color" id="pc" value="#818cf8"></div>
+  <label>Keep OUTSIDE:</label>
+  <select id="excl"><option value="missing" selected>Missing / suggested</option><option value="all">All non-defined</option><option value="none">None</option></select>
   <div class="row"><button id="btnRebuild">Rebuild</button><button id="btnFit">Fit view</button></div>
-  <div class="hint" id="inside" style="font-size:11px;margin-top:4px"></div>
+  <div class="hint" id="inside" style="font-size:10px;margin-top:3px"></div>
   <h4>View Controls</h4>
-  <label>Sector size: <b id="sVal">1.0</b>x</label><input type="range" id="ss" min="0.5" max="6" step="0.1" value="1">
-  <label>Font size: <b id="fVal">13</b>px</label><input type="range" id="fs" min="8" max="28" step="1" value="13">
+  <label>Sector: <b id="sVal">1.0</b>x</label><input type="range" id="ss" min="0.5" max="6" step="0.1" value="1">
+  <label>Font: <b id="fVal">13</b>px</label><input type="range" id="fs" min="8" max="28" step="1" value="13">
   <label><input type="checkbox" id="vLines" checked> HO lines</label>
   <label><input type="checkbox" id="vMiss" checked> Missing sites</label>
   <label><input type="checkbox" id="vOther" checked> Other sites</label>
-  <label><input type="checkbox" id="vLbl" checked> Site labels</label>
-  <label><input type="checkbox" id="vBlue"> <b>All sites blue</b></label>
-  <h4>Neighbour Summary</h4><div class="stat" id="stats"></div><div id="warn"></div>
+  <label><input type="checkbox" id="vLbl" checked> Labels</label>
+  <label><input type="checkbox" id="vBlue"> <b>All blue</b></label>
+  <h4>Summary</h4><div class="stat" id="stats"></div><div id="warn"></div>
   <h4>Neighbours</h4><div class="pills" id="pills"></div><div id="list"></div>
-  <div class="row"><button id="btnCsv">Export missing (this)</button><button id="btnCsvAll">Export missing (all)</button></div>
+  <div class="row"><button id="btnCsv">Export missing</button><button id="btnCsvAll">All sources</button></div>
   <h4>Legend</h4>
   <div class="lg"><span class="sw" style="background:#ef4444"></span>Source</div>
   <div class="lg"><span class="sw" style="background:#3b82f6"></span>Defined NBR</div>
   <div class="lg"><span class="sw" style="background:#f59e0b"></span>Missing</div>
   <div class="lg"><span class="sw" style="background:#9ca3af"></span>Other</div>
+  <div class="lg"><span style="width:22px;border-top:2px solid #10b981"></span>HO link</div>
+  <div class="lg"><span style="width:22px;border-top:2px dashed #f59e0b"></span>Missing link</div>
   </div>
 </div>
 <div id="mapbox"><div id="map"></div>
-  <div id="mbtn"><button class="mb" id="tg">☰ Panel</button><button class="mb" id="btnSel">☑ Select</button><button class="mb" id="btnRul">📏 Ruler</button></div>
-  <div id="rbox"><b style="color:#818cf8">Ruler</b> <div id="rTot" style="margin:6px 0 2px;font-size:13px;font-weight:bold;color:#f87171">Total: 0.00 km / 0.00 mi</div><div id="rSeg" class="hint"></div><div class="row"><button id="rUndo">Undo</button><button id="rClr">Clear</button></div></div>
+  <div id="mbtn"><button class="mb" id="tg">☰</button><button class="mb" id="btnSel">☑ Select</button><button class="mb" id="btnRul">📏 Ruler</button></div>
+  <div id="rbox"><b style="color:#818cf8;font-size:11px">Ruler</b> <div id="rTot" style="margin:5px 0 2px;font-size:12px;font-weight:bold;color:#f87171">Total: 0.00 km / 0.00 mi</div><div id="rSeg" class="hint" style="font-size:10px"></div><div class="row" style="margin-top:5px"><button id="rUndo">Undo</button><button id="rClr">Clear</button></div></div>
   <div id="selbar"><span id="selN">0 selected</span><button id="selCopy">Copy</button><button id="selCsv">CSV</button><button id="selVis">Select visible</button><button id="selClr">Clear</button></div>
   <div id="toast"></div></div>
-</div>
-<div id="ftr">@Rajesh Dubey | rajesh.dubey@sds.com</div>
 </div>
 <div id="mdl"><div class="mbox"><div class="mh"><b>Selected sites</b><button id="mX">✕</button></div><div class="fm"><button data-f="excel" class="on">Excel</button><button data-f="usid">USID</button><button data-f="csv">CSV</button></div><textarea id="mTa" readonly></textarea><div class="mf"><span id="mN"></span><button id="mCopy">Copy</button><button id="mDl">Download</button></div></div></div>
 <script>
@@ -227,7 +351,7 @@ const STAT = {ok:['Defined','#10b981'], zero_ho:['0% HO','#f59e0b'], no_coords:[
 const WHY = {no_coords:'Defined in table, not in site file', zero_ho:'Defined but 0 HO', not_defined:'Closest site, not in table'};
 const MI = 69.093;
 function hav(la1, lo1, la2, lo2) { const r = Math.PI/180, a = Math.sin((la2-la1)*r/2)**2 + Math.cos(la1*r)*Math.cos(la2*r)*Math.sin((lo2-lo1)*r/2)**2; return 2*3958.8*Math.asin(Math.sqrt(a)); }
-function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3500); }
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3000); }
 function analyse(u) {
   const s = S[u], entry = D.nbr[u], rows = entry ? entry[1] : [];
   const defd = {};
@@ -320,7 +444,7 @@ $('ps').addEventListener('change', e => poly.setStyle({dashArray:e.target.value 
 $('pc').addEventListener('input', e => poly.setStyle({color:e.target.value}));
 $('ss').addEventListener('input', e => { $('sVal').textContent = (+e.target.value).toFixed(1); radius = CFG.radiusM * e.target.value; wedges.forEach(w => w.p.setLatLngs(wedge(w.s[1], w.s[2], w.az, radius))); });
 $('fs').addEventListener('input', e => { $('fVal').textContent = e.target.value; mapEl.style.setProperty('--fs', e.target.value + 'px'); });
-function fit() { if (!cur) return; const b = L.latLngBounds([]); if (polyPts.length && $('chkShow').checked) polyPts.forEach(p => b.extend(p)); Object.keys(cur.role).forEach(k => b.extend([S[k][1], S[k][2]])); if (b.isValid()) map.fitBounds(b, {padding:[40, 40]}); }
+function fit() { if (!cur) return; const b = L.latLngBounds([]); if (polyPts.length && $('chkShow').checked) polyPts.forEach(p => b.extend(p)); Object.keys(cur.role).forEach(k => b.extend([S[k][1], S[k][2]])); if (b.isValid()) map.fitBounds(b, {padding:[30, 30]}); }
 $('btnFit').addEventListener('click', fit); $('tg').addEventListener('click', () => { const s = $('side'); s.style.display = s.style.display === 'none' ? '' : 'none'; setTimeout(() => map.invalidateSize(), 50); });
 const PILLS = [['all', 'All'], ['ok', 'Defined OK'], ['miss', 'Missing / suggested']];
 function renderPills() { $('pills').innerHTML = PILLS.map(p => '<button data-f="' + p[0] + '" class="' + (filter === p[0] ? 'on' : '') + '">' + p[1] + '</button>').join(''); }
@@ -370,11 +494,17 @@ $('rUndo').addEventListener('click', () => { rPts.pop(); drawRuler(); }); $('rCl
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !(e.target.tagName === 'INPUT')) { setMode(null); $('mdl').style.display = 'none'; } });
 (function init() { if (ALL.length) { const b = L.latLngBounds(ALL.map(k => [S[k][1], S[k][2]])); map.fitBounds(b); } })();
 </script></body></html>"""
-            
-            final_html = HTML.replace("__DATA__", data)
-            components.html(final_html, height=900, scrolling=True)
-            
-        except Exception as e:
-            st.error(f"Error processing files: {e}")
+                
+                final_html = HTML.replace("__DATA__", data)
+                components.html(final_html, height=850, scrolling=False)
+                
+            except Exception as e:
+                st.error(f"Error: {e}")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
 else:
-    st.info("👆 Please upload both the Site Data and SQL Table files to begin.")
+    with st.container():
+        st.markdown('<div class="map-container" style="padding:40px;text-align:center;color:#64748b">', unsafe_allow_html=True)
+        st.markdown("### 📁 Upload both files to generate the interactive map")
+        st.markdown("1. **Site Data** (CSV) - Contains USID, coordinates, azimuth, cell info<br>2. **SQL Table** (Excel/CSV) - Contains neighbor relationships and HO data")
+        st.markdown('</div>', unsafe_allow_html=True)
