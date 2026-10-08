@@ -157,7 +157,7 @@ def select_sites(sites, tbl, sources):
         la, lo = sites.at[s, "lat"], sites.at[s, "lon"]
         dlon = dlat / max(math.cos(math.radians(la)), 0.01)
         keep |= (np.abs(lat - la) <= dlat) & (np.abs(lon - lo) <= dlon)
-        keep |= sites.index.isin(set(tbl.loc[tbl[NBR_SRC_COL].isin(sources), NBR_COL]))
+    keep |= sites.index.isin(set(tbl.loc[tbl[NBR_SRC_COL].isin(sources), NBR_COL]))
     return sites[keep]
 
 def build_payload(df, tbl, user=None, log_url="", log_token=""):
@@ -185,8 +185,8 @@ def build_payload(df, tbl, user=None, log_url="", log_token=""):
     return {"cfg": cfg, "sites": site_json, "nbr": nbr_json}
 
 def render_html(payload):
-    data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\/")
-    return HTML.replace("DATA", data)
+    data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    return HTML.replace("__DATA__", data)
 
 def post_log(url, token, event, user, extra=""):
     """Server-side log line (used for the 'go' event). Never breaks the app."""
@@ -205,11 +205,11 @@ def post_log(url, token, event, user, extra=""):
 
 # ───────────────────────── HTML / JS (map + side panel) ─────────────────────────
 HTML = r"""<!DOCTYPE html>
-<html lang="en"> <head> <meta charset="utf-8"> <title>Cluster NBR Map</title>
- <meta name="viewport" content="width=device-width, initial-scale=1">
- <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
- <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
- <style>
+<html lang="en"><head><meta charset="utf-8"><title>Cluster NBR Map</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;color:#e2e8f0;background:#0a0e1a;overflow:hidden}
 #app{display:flex;flex-direction:column;height:100%}
@@ -286,107 +286,109 @@ input[type="color"]{width:32px;height:24px;border:1px solid #334155;border-radiu
 .ov-box{text-align:center;color:#e2e8f0}.ov-t{font-size:16px;font-weight:600;margin-top:14px}.ov-s{font-size:11px;color:#94a3b8;margin-top:4px}
 .spin{width:46px;height:46px;border:5px solid #1e293b;border-top-color:#3b82f6;border-radius:50%;margin:0 auto;animation:sp 0.9s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
- </style> </head> <body>
- <div id="app">
- <div id="wrap">
- <div id="side">
- <div class="search-label">PROVIDE USID</div>
- <div style="position:relative" class="srch">
- <input id="q" title="Provide USID" placeholder="Enter USID / site name" autocomplete="off">
- <div id="ac"></div>
- </div>
- <div id="empty" style="color:#64748b;font-size:10px;margin-top:4px">Type a USID above, or click any site on the map.</div>
- <div id="panel" style="display:none">
- <div class="src-title" id="tSrc"></div>
- <div class="src-sub" id="tSub"></div>
- <div class="src-info" id="tInfo"></div>
- <div class="section-title">POLYGON CONTROLS</div>
- <div class="ctrl-row"><label><input type="checkbox" id="chkShow" checked><b>Show polygon</b></label></div>
- <div class="ctrl-row"><label><input type="checkbox" id="chkEdit"><b style="color:#60a5fa">Enable editing</b></label></div>
- <div class="hint">Drag handles, click line to add, right-click to delete</div>
- <div class="ctrl-label">Buffer: <b id="bufVal"></b> mi</div>
- <input type="range" id="buf" min="0" max="6" step="0.1">
- <div class="ctrl-label">Line: <b id="wVal">3</b> px</div>
- <input type="range" id="pw" min="1" max="10" step="1" value="3">
- <select id="ps"><option value="" selected>Solid</option><option value="6, 6">Dashed</option><option value="2, 4">Dotted</option></select>
- <div class="ctrl-row"><span style="color:#94a3b8">Colour</span><input type="color" id="pc" value="#3b82f6"></div>
- <div class="ctrl-label">Keep OUTSIDE:</div>
- <select id="excl"><option value="missing" selected>Missing / suggested</option><option value="all">All non-defined sites</option><option value="none">None (convex hull)</option></select>
- <div class="btn-row"><button class="btn" id="btnRebuild">Rebuild</button><button class="btn" id="btnFit">Fit view</button></div>
- <div id="inside"></div>
- <div class="section-title">VIEW CONTROLS</div>
- <div class="ctrl-label">Sector: <b id="sVal">1.0</b> x</div>
- <input type="range" id="ss" min="0.5" max="6" step="0.1" value="1">
- <div class="ctrl-label">Font: <b id="fVal">13</b> px</div>
- <input type="range" id="fs" min="8" max="28" step="1" value="13">
- <div class="ctrl-row"><label><input type="checkbox" id="vLines" checked>HO lines</label></div>
- <div class="ctrl-row"><label><input type="checkbox" id="vMiss" checked>Missing sites</label></div>
- <div class="ctrl-row"><label><input type="checkbox" id="vOther" checked>Other sites</label></div>
- <div class="ctrl-row"><label><input type="checkbox" id="vLbl" checked>Labels</label></div>
- <div class="ctrl-row"><label><input type="checkbox" id="vBlue"><b>All blue</b><span style="color:#64748b">(except source)</span></label></div>
- <div class="section-title">SUMMARY</div>
- <div class="stats" id="stats"></div>
- <div id="warn"></div>
- <div class="section-title">NEIGHBOURS<span style="font-weight:normal;color:#64748b">(tick = in polygon)</span></div>
- <div class="pills" id="pills"></div>
- <div id="list"></div>
- <div class="btn-row"><button class="btn" id="btnCsv">Export missing</button><button class="btn" id="btnCsvAll">Export all</button></div>
- <div class="section-title">LEGEND</div>
- <div style="font-size:11px;color:#cbd5e1">
- <div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:12px;height:12px;background:#f97316;border-radius:2px"></span>Source site</div>
- <div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:12px;height:12px;background:#3b82f6;border-radius:2px"></span>Defined neighbour</div>
- <div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:12px;height:12px;background:#f59e0b;border-radius:2px"></span>Missing / suggested</div>
- <div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:12px;height:12px;background:#6b7280;border-radius:2px"></span>Other site</div>
- <div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:20px;border-top:2px solid #10b981"></span>HO link</div>
- <div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:20px;border-top:2px dashed #f59e0b"></span>Missing link</div>
- </div>
- </div>
- </div>
- <div id="mapbox">
- <div id="map"></div>
- <div id="mbtn">
- <button class="mb" id="tg" title="Show / hide panel">☰</button>
- <button class="mb" id="btnSel" title="Select sites: click a site, or draw a polygon around many sites">Select</button>
- <button class="mb" id="btnRul" title="Measure distance (km / mi)"> Ruler</button>
- </div>
- <div id="rbox">
- <b style="color:#60a5fa;font-size:11px">Distance ruler</b>
- <div class="hint">Click points on the map (click a site to snap to it)</div>
- <div id="rTot" style="margin:6px 0 2px;font-size:12px;font-weight:bold;color:#f87171">Total: 0.00 km / 0.00 mi</div>
- <div id="rSeg" class="hint"></div>
- <div class="btn-row" style="margin-top:6px"><button class="btn" id="rUndo">Undo last point</button><button class="btn" id="rClr">Clear</button></div>
- </div>
- <div id="selbar">
- <span id="selN">0 selected</span>
- <span id="drawCtl"><button class="btn btn-primary" id="selFin">Close polygon</button><button class="btn" id="selUndo">Undo point</button><button class="btn" id="selCancel">Cancel</button></span>
- <button class="btn" id="selCopy">Copy</button>
- <button class="btn" id="selCsv">Export CSV</button>
- <button class="btn" id="selVis">Select all visible</button>
- <button class="btn" id="selClr">Clear</button>
- </div>
- <div id="toast"></div>
- </div>
- </div>
- </div>
- <div id="loading"><div class="ov-box"><div class="spin"></div><div class="ov-t">Rendering map...</div><div class="ov-s">Please wait</div></div></div>
- <div id="mdl"><div class="mbox">
- <div class="mh"><b>Selected sites</b><button id="mX" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px">✕</button></div>
- <div class="fm"><button data-f="excel" class="btn on">Excel (tab)</button><button data-f="usid" class="btn">USID only</button><button data-f="csv" class="btn">CSV</button></div>
- <textarea id="mTa" readonly></textarea>
- <div class="mf"><span id="mN"></span><button class="btn" id="mCopy">Copy to clipboard</button><button class="btn" id="mDl">Download CSV</button></div>
- </div></div>
- <script>
+</style></head><body>
+<div id="app">
+<div id="wrap">
+<div id="side">
+<div class="search-label">PROVIDE USID</div>
+<div style="position:relative" class="srch">
+<input id="q" title="Provide USID" placeholder="Enter USID / site name" autocomplete="off">
+<div id="ac"></div>
+</div>
+<div id="empty" style="color:#64748b;font-size:10px;margin-top:4px">Type a USID above, or click any site on the map.</div>
+<div id="panel" style="display:none">
+<div class="src-title" id="tSrc"></div>
+<div class="src-sub" id="tSub"></div>
+<div class="src-info" id="tInfo"></div>
+<div class="section-title">POLYGON CONTROLS</div>
+<div class="ctrl-row"><label><input type="checkbox" id="chkShow" checked> <b>Show polygon</b></label></div>
+<div class="ctrl-row"><label><input type="checkbox" id="chkEdit"> <b style="color:#60a5fa">Enable editing</b></label></div>
+<div class="hint">Drag handles, click line to add, right-click to delete</div>
+<div class="ctrl-label">Buffer: <b id="bufVal"></b> mi</div>
+<input type="range" id="buf" min="0" max="6" step="0.1">
+<div class="ctrl-label">Line: <b id="wVal">3</b> px</div>
+<input type="range" id="pw" min="1" max="10" step="1" value="3">
+<select id="ps"><option value="" selected>Solid</option><option value="6, 6">Dashed</option><option value="2, 4">Dotted</option></select>
+<div class="ctrl-row"><span style="color:#94a3b8">Colour</span><input type="color" id="pc" value="#3b82f6"></div>
+<div class="ctrl-label">Keep OUTSIDE:</div>
+<select id="excl"><option value="missing" selected>Missing / suggested</option><option value="all">All non-defined sites</option><option value="none">None (convex hull)</option></select>
+<div class="btn-row"><button class="btn" id="btnRebuild">Rebuild</button><button class="btn" id="btnFit">Fit view</button></div>
+<div id="inside"></div>
+<div class="section-title">VIEW CONTROLS</div>
+<div class="ctrl-label">Sector: <b id="sVal">1.0</b> x</div>
+<input type="range" id="ss" min="0.5" max="6" step="0.1" value="1">
+<div class="ctrl-label">Font: <b id="fVal">13</b> px</div>
+<input type="range" id="fs" min="8" max="28" step="1" value="13">
+<div class="ctrl-row"><label><input type="checkbox" id="vLines" checked> HO lines</label></div>
+<div class="ctrl-row"><label><input type="checkbox" id="vMiss" checked> Missing sites</label></div>
+<div class="ctrl-row"><label><input type="checkbox" id="vOther" checked> Other sites</label></div>
+<div class="ctrl-row"><label><input type="checkbox" id="vLbl" checked> Labels</label></div>
+<div class="ctrl-row"><label><input type="checkbox" id="vBlue"> <b>All blue</b> <span style="color:#64748b">(except source)</span></label></div>
+<div class="section-title">SUMMARY</div>
+<div class="stats" id="stats"></div>
+<div id="warn"></div>
+<div class="section-title">NEIGHBOURS <span style="font-weight:normal;color:#64748b">(tick = in polygon)</span></div>
+<div class="pills" id="pills"></div>
+<div id="list"></div>
+<div class="btn-row"><button class="btn" id="btnCsv">Export missing</button><button class="btn" id="btnCsvAll">Export all</button></div>
+<div class="section-title">LEGEND</div>
+<div style="font-size:11px;color:#cbd5e1">
+<div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:12px;height:12px;background:#f97316;border-radius:2px"></span>Source site</div>
+<div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:12px;height:12px;background:#3b82f6;border-radius:2px"></span>Defined neighbour</div>
+<div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:12px;height:12px;background:#f59e0b;border-radius:2px"></span>Missing / suggested</div>
+<div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:12px;height:12px;background:#6b7280;border-radius:2px"></span>Other site</div>
+<div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:20px;border-top:2px solid #10b981"></span>HO link</div>
+<div style="display:flex;align-items:center;gap:6px;margin:3px 0"><span style="width:20px;border-top:2px dashed #f59e0b"></span>Missing link</div>
+</div>
+</div>
+</div>
+<div id="mapbox">
+<div id="map"></div>
+<div id="mbtn">
+<button class="mb" id="tg" title="Show / hide panel">☰</button>
+<button class="mb" id="btnSel" title="Select sites: click a site, or draw a polygon around many sites"> Select</button>
+<button class="mb" id="btnRul" title="Measure distance (km / mi)">📏 Ruler</button>
+</div>
+<div id="rbox">
+<b style="color:#60a5fa;font-size:11px">Distance ruler</b>
+<div class="hint">Click points on the map (click a site to snap to it)</div>
+<div id="rTot" style="margin:6px 0 2px;font-size:12px;font-weight:bold;color:#f87171">Total: 0.00 km / 0.00 mi</div>
+<div id="rSeg" class="hint"></div>
+<div class="btn-row" style="margin-top:6px"><button class="btn" id="rUndo">Undo last point</button><button class="btn" id="rClr">Clear</button></div>
+</div>
+<div id="selbar">
+<span id="selN">0 selected</span>
+<span id="drawCtl"><button class="btn btn-primary" id="selFin">Close polygon</button><button class="btn" id="selUndo">Undo point</button><button class="btn" id="selCancel">Cancel</button></span>
+<button class="btn" id="selCopy">Copy</button>
+<button class="btn" id="selCsv">Export CSV</button>
+<button class="btn" id="selVis">Select all visible</button>
+<button class="btn" id="selClr">Clear</button>
+</div>
+<div id="toast"></div>
+</div>
+</div>
+</div>
+<div id="loading"><div class="ov-box"><div class="spin"></div><div class="ov-t">Rendering map ...</div><div class="ov-s">Please wait</div></div></div>
+<div id="mdl"><div class="mbox">
+<div class="mh"><b>Selected sites</b><button id="mX" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px">✕</button></div>
+<div class="fm"><button data-f="excel" class="btn on">Excel (tab)</button><button data-f="usid" class="btn">USID only</button><button data-f="csv" class="btn">CSV</button></div>
+<textarea id="mTa" readonly></textarea>
+<div class="mf"><span id="mN"></span><button class="btn" id="mCopy">Copy to clipboard</button><button class="btn" id="mDl">Download CSV</button></div>
+</div></div>
+<script>
 const D = __DATA__;
 const S = D.sites, CFG = D.cfg, ALL = Object.keys(S);
 const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const COL = {source:'#f97316', ok:'#3b82f6', missing:'#f59e0b', other:'#6b7280'};
 const TXT = {source:'#f97316', ok:'#3b82f6', missing:'#f59e0b', other:'#9ca3af'};
 const STAT = {ok:['Defined','#10b981'], zero_ho:['0% HO','#f59e0b'], no_coords:['Not in file','#ef4444'], not_defined:['Suggested','#8b5cf6']};
 const WHY = {no_coords:'Defined in table, not in site file', zero_ho:'Defined but 0 HO', not_defined:'Closest site, not in table'};
 const MI = 69.093;
+
 function hav(la1, lo1, la2, lo2) { const r = Math.PI/180, a = Math.sin((la2-la1)*r/2)**2 + Math.cos(la1*r)*Math.cos(la2*r)*Math.sin((lo2-lo1)*r/2)**2; return 2*3958.8*Math.asin(Math.sqrt(a)); }
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3000); }
+
 const USER = CFG.user || {};
 let _lastLog = {k:'', t:0};
 function logEvent(event, usid, via, extra) {
@@ -400,6 +402,7 @@ cluster:(D.nbr[usid] && D.nbr[usid][0]) || '', user_id:USER.id || '', name:USER.
 ts_utc:d.toISOString(), ts_local:d.toLocaleString('en-IN', {timeZone:'Asia/Kolkata', hour12:false}), extra:extra || ''};
 try { fetch(CFG.logUrl, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(body), keepalive:true}).catch(() => {}); } catch (e) {}
 }
+
 function analyse(u) {
 const s = S[u], entry = D.nbr[u], rows = entry ? entry[1] : [];
 const defd = {};
@@ -412,21 +415,24 @@ if (CFG.closestN) ALL.filter(k => k !== u).sort((a, b) => dist[a] - dist[b]).sli
 nbrs.sort((a, b) => ((a.st !== 'ok') - (b.st !== 'ok')) || ((b.ho || 0) - (a.ho || 0)));
 return {src:u, cluster:entry ? entry[0] : '', defined:Object.keys(defd).length, nbrs, dist};
 }
+
 const map = L.map('map').setView([39.5, -98.35], 4);
 const base = {
 'Topo': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'Esri, USGS, NOAA, OpenStreetMap contributors'}),
-'Street': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'© OpenStreetMap contributors'}),
+'Street': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap contributors'}),
 'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'Esri'}),
-'Light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {maxZoom:19, attribution:'© OpenStreetMap © CARTO'})
+'Light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {maxZoom:19, attribution:'&copy; OpenStreetMap &copy; CARTO'})
 };
 base.Topo.addTo(map); L.control.layers(base, null, {position:'topright'}).addTo(map);
 map.createPane('poly'); map.getPane('poly').style.zIndex = 450;
 const mapEl = map.getContainer();
 const zoomCls = () => mapEl.classList.toggle('zhi', map.getZoom() >= 12);
 map.on('zoomend', zoomCls); zoomCls();
+
 const G = {other:L.layerGroup(), missing:L.layerGroup(), ok:L.layerGroup(), source:L.layerGroup()};
 const LG = {ok:L.layerGroup(), missing:L.layerGroup()};
 Object.values(G).concat(Object.values(LG)).forEach(g => g.addTo(map));
+
 function recolor() {
 const blue = $('vBlue').checked, c = role => blue && role !== 'source' ? COL.ok : COL[role];
 wedges.forEach(w => w.p.setStyle({fillColor:c(w.role)}));
@@ -437,6 +443,7 @@ function setLayer(g, on) { on ? map.addLayer(g) : map.removeLayer(g); }
 function applyVis() { setLayer(G.other, $('vOther').checked); setLayer(G.missing, $('vMiss').checked); setLayer(LG.ok, $('vLines').checked); setLayer(LG.missing, $('vLines').checked && $('vMiss').checked); mapEl.classList.toggle('nolbl', !$('vLbl').checked); }
 ['vLines','vMiss','vOther','vLbl'].forEach(id => $(id).addEventListener('change', applyVis));
 $('vBlue').addEventListener('change', recolor);
+
 function wedge(lat, lon, az, r) {
 const la = lat*Math.PI/180, lo = lon*Math.PI/180, d = r/6371000, pts = [[lat, lon]];
 for (let i = 0; i <= 13; i++) {
@@ -447,19 +454,23 @@ pts.push([pl*180/Math.PI, pn*180/Math.PI]);
 }
 return pts;
 }
+
 let LAT0 = 0, LON0 = 0;
-const toXY = (lat, lon) => [(lon - LON0) * Math.cos(LAT0 * Math.PI/180)*MI, (lat - LAT0)*MI];
+const toXY = (lat, lon) => [(lon - LON0)*Math.cos(LAT0*Math.PI/180)*MI, (lat - LAT0)*MI];
 const toLL = (x, y) => [LAT0 + y/MI, LON0 + x/(Math.cos(LAT0*Math.PI/180)*MI)];
-function pip(p, poly) { let inside = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1]; if (((yi > p[1]) !== (yj > p[1])) && (p[0] < (xj - xi) * (p[1] - yi)/(yj - yi) + xi)) inside = !inside; } return inside; }
+function pip(p, poly) { let inside = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1]; if (((yi > p[1]) !== (yj > p[1])) && (p[0] < (xj - xi)*(p[1] - yi)/(yj - yi) + xi)) inside = !inside; } return inside; }
 function segInfo(p, a, b) { const dx = b[0]-a[0], dy = b[1]-a[1], L2 = dx*dx + dy*dy; let t = L2 ? ((p[0]-a[0])*dx + (p[1]-a[1])*dy)/L2 : 0; t = Math.max(0, Math.min(1, t)); const q = [a[0] + t*dx, a[1] + t*dy]; return {q, t, d:Math.hypot(p[0]-q[0], p[1]-q[1]), L:Math.sqrt(L2)}; }
 function convexHull(points) { const seen = new Set(), pts = points.filter(p => { const k = p.join(','); if (seen.has(k)) return false; seen.add(k); return true; }).sort((a, b) => a[0] - b[0] || a[1] - b[1]); if (pts.length <= 2) return pts; const cross = (o, a, b) => (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]); const half = arr => { const h = []; arr.forEach(p => { while (h.length >= 2 && cross(h[h.length-2], h[h.length-1], p) <= 0) h.pop(); h.push(p); }); h.pop(); return h; }; return half(pts).concat(half(pts.slice().reverse())); }
 function offsetMiles(lat, lon, miles, bearingDeg) { const la = lat*Math.PI/180, lo = lon*Math.PI/180, b = bearingDeg*Math.PI/180, d = miles/3958.8; const nl = Math.asin(Math.sin(la)*Math.cos(d) + Math.cos(la)*Math.sin(d)*Math.cos(b)); const nn = lo + Math.atan2(Math.sin(b)*Math.sin(d)*Math.cos(la), Math.cos(d) - Math.sin(la)*Math.sin(nl)); return [nl*180/Math.PI, nn*180/Math.PI]; }
 function bufferHull(hull, miles) { const cLat = hull.reduce((a, p) => a + p[0], 0)/hull.length, cLon = hull.reduce((a, p) => a + p[1], 0)/hull.length; return hull.map(p => offsetMiles(p[0], p[1], miles, Math.atan2(p[1]-cLon, p[0]-cLat)*180/Math.PI)); }
 function carvePolygon(poly, targets, members, W, M) { let done = 0, skipped = 0; const gone = []; const bdist = (pl, t) => Math.min(...pl.map((a, i) => segInfo(t, a, pl[(i+1) % pl.length]).d)); targets.map(t => ({p:t, d:bdist(poly, t)})).sort((a, b) => a.d - b.d).forEach(o => { const p = o.p; if (!pip(p, poly)) { gone.push(p); return; } const edges = poly.map((a, i) => Object.assign({i, a, b:poly[(i+1) % poly.length]}, segInfo(p, a, poly[(i+1) % poly.length]))).filter(e => e.d > 1e-6 && e.L > 1e-6).sort((x, y) => x.d - y.d).slice(0, 4); for (const e of edges) { const ux = (p[0]-e.q[0])/e.d, uy = (p[1]-e.q[1])/e.d; const tip = [p[0] + ux*M, p[1] + uy*M], lerp = t => [e.a[0] + (e.b[0]-e.a[0])*t, e.a[1] + (e.b[1]-e.a[1])*t]; const ins = []; if (e.t*e.L > W) ins.push(lerp(e.t - W/e.L)); ins.push(tip); if ((1-e.t)*e.L > W) ins.push(lerp(e.t + W/e.L)); const cand = poly.slice(0, e.i + 1).concat(ins, poly.slice(e.i + 1)); if (!pip(p, cand) && members.every(m => pip(m, cand)) && gone.every(g => !pip(g, cand))) { poly = cand; gone.push(p); done++; return; } } skipped++; }); return {poly, done, skipped}; }
+
 let cur = null, wedges = [], dots = [], siteLayers = {}, radius = CFG.radiusM, incl = {}, polyPts = [], dirty = false, handles = [], lastBuf = CFG.buffer, filter = 'all';
 const poly = L.polygon([], {pane:'poly', color:'#3b82f6', weight:3, fill:false, bubblingMouseEvents:false}).addTo(map);
+
 function tip(u, extra) { const s = S[u], n = cur && cur.NB[u]; let h = '<b>' + esc(s[0]) + '</b><br>USID: ' + esc(u); if (cur && u === cur.src) h += '<br><span style="color:#f97316">SOURCE</span>'; else if (n) { h += '<br>' + STAT[n.st][0]; if (n.pct != null) h += ' · HO ' + n.pct.toFixed(1) + '%'; if (n.d != null) h += ' · ' + n.d + ' mi'; } return h + (extra || ''); }
 const popup = (u, extra) => tip(u, extra) + '<br><a href="#" onclick="loadSource(\'' + String(u).replace(/'/g, '') + '\',\'map\');return false" style="color:#60a5fa">Load as source</a>';
+
 function loadSource(u, via) {
 u = String(u).trim().toUpperCase(); if (!S[u]) { toast('USID not found'); return; }
 if (via) logEvent('search', u, via);
@@ -501,6 +512,7 @@ filter = 'all'; renderPills(); renderList();
 if (!D.nbr[u]) toast('No neighbour definition for ' + u + ' - showing closest-site suggestions only');
 buildPoly(); fit();
 }
+
 function buildPoly() { const pts = Object.keys(incl).filter(k => incl[k] && S[k]).map(k => [S[k][1], S[k][2]]); const hull = convexHull(pts); polyPts = hull.length >= 3 ? bufferHull(hull, parseFloat($('buf').value)) : []; poly.setLatLngs(polyPts); applyExclusion(); dirty = false; makeHandles(); updateInside(); if (!polyPts.length) toast('Need at least 3 ticked sites to form a polygon'); }
 function tryRebuild() { if (dirty && !confirm('Rebuilding will discard your manual polygon edits. Continue?')) return false; buildPoly(); return true; }
 function updateInside() { if (!cur || !polyPts.length) { $('inside').innerHTML = ''; return; } const P = polyPts.map(p => toXY(p[0], p[1])); const ins = Object.keys(cur.role).filter(k => cur.role[k] === 'missing' && !incl[k] && pip(toXY(S[k][1], S[k][2]), P)); $('inside').innerHTML = ins.length ? '<div class="inside-warn">' + ins.length + ' missing site(s) inside polygon: ' + ins.map(k => esc(S[k][0])).join(', ') + '</div>' : '<div class="inside-ok">No missing sites inside the polygon</div>'; }
@@ -521,16 +533,19 @@ $('ss').addEventListener('input', e => { $('sVal').textContent = (+e.target.valu
 $('fs').addEventListener('input', e => { $('fVal').textContent = e.target.value; mapEl.style.setProperty('--fs', e.target.value + 'px'); });
 function fit() { if (!cur) return; const b = L.latLngBounds([]); if (polyPts.length && $('chkShow').checked) polyPts.forEach(p => b.extend(p)); Object.keys(cur.role).forEach(k => b.extend([S[k][1], S[k][2]])); if (b.isValid()) map.fitBounds(b, {padding:[30, 30]}); }
 $('btnFit').addEventListener('click', fit); $('tg').addEventListener('click', () => { const s = $('side'); s.style.display = s.style.display === 'none' ? '' : 'none'; setTimeout(() => map.invalidateSize(), 50); });
+
 const PILLS = [['all', 'All'], ['ok', 'Defined OK'], ['miss', 'Missing / suggested']];
 function renderPills() { $('pills').innerHTML = PILLS.map(p => '<button data-f="' + p[0] + '" class="' + (filter === p[0] ? 'on' : '') + '">' + p[1] + '</button>').join(''); }
 function renderList() { const rows = cur.nbrs.filter(n => filter === 'all' || (filter === 'ok' && n.st === 'ok') || (filter === 'miss' && n.st !== 'ok')); $('list').innerHTML = rows.length ? rows.map(n => { const has = !!S[n.u]; const meta = [n.ho != null ? (n.ho === 0 ? '<span style="color:#f59e0b">HO 0</span>' : 'HO ' + n.ho) : '', n.pct != null ? n.pct.toFixed(1) + '%' : '', n.d != null ? n.d + ' mi' : '', n.st === 'not_defined' ? 'not in SQL table' : ''].filter(Boolean).join(' · '); return '<div class="nb" data-u="' + esc(n.u) + '"><div class="nbt">' + (has ? '<input type="checkbox" class="inc" data-u="' + esc(n.u) + '"' + (incl[n.u] ? ' checked' : '') + '>' : '<span style="width:13px"></span>') + '<b>' + esc(n.u) + '</b><span class="nm">' + esc(n.n) + '</span><span class="bd" style="background:' + STAT[n.st][1] + '">' + STAT[n.st][0] + '</span></div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>'; }).join('') : '<div class="hint">Nothing to show.</div>'; }
 $('pills').addEventListener('click', e => { if (e.target.dataset.f) { filter = e.target.dataset.f; renderPills(); renderList(); } });
 $('list').addEventListener('change', e => { if (!e.target.classList.contains('inc')) return; const u = e.target.dataset.u; incl[u] = e.target.checked; if (!tryRebuild()) { e.target.checked = !e.target.checked; incl[u] = e.target.checked; } });
 $('list').addEventListener('click', e => { if (e.target.closest('.inc')) return; const row = e.target.closest('.nb'); if (!row) return; const s = S[row.dataset.u]; if (s) map.flyTo([s[1], s[2]], Math.max(map.getZoom(), 13)); else toast(row.dataset.u + ' has no coordinates in the site file'); });
+
 function csvDownload(rows, name) { const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; const csv = [['Source_USID','Missing_USID','Site_Name','Reason','HO_ATT','Pct_Sharing','Dist_miles','Latitude','Longitude']].concat(rows).map(r => r.map(q).join(',')).join('\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'})); a.download = name; a.click(); }
 const missRows = A => A.nbrs.filter(n => n.st !== 'ok').map(n => [A.src, n.u, n.n, WHY[n.st], n.ho, n.pct, n.d, n.lat, n.lon]);
 $('btnCsv').addEventListener('click', () => { const rows = missRows(cur); if (!rows.length) { toast('No missing neighbours'); return; } csvDownload(rows, 'missing_neighbors_' + cur.src + '.csv'); });
-$('btnCsvAll').addEventListener('click', () => { toast('Analysing all sources...'); setTimeout(() => { let rows = []; Object.keys(D.nbr).forEach(u => { if (S[u]) rows = rows.concat(missRows(analyse(u))); }); if (!rows.length) { toast('No missing neighbours'); return; } csvDownload(rows, 'missing_neighbors_all_sources.csv'); toast('Exported ' + rows.length + ' rows'); }, 50); });
+$('btnCsvAll').addEventListener('click', () => { toast('Analysing all sources ...'); setTimeout(() => { let rows = []; Object.keys(D.nbr).forEach(u => { if (S[u]) rows = rows.concat(missRows(analyse(u))); }); if (!rows.length) { toast('No missing neighbours'); return; } csvDownload(rows, 'missing_neighbors_all_sources.csv'); toast('Exported ' + rows.length + ' rows'); }, 50); });
+
 let acIdx = -1;
 function acHits(v) { v = v.trim().toUpperCase(); if (v.length < 2) return []; const starts = [], inc = []; for (const k of ALL) { const nm = String(S[k][0]).toUpperCase(); if (k === v || k.startsWith(v) || nm.startsWith(v)) starts.push(k); else if (k.includes(v) || nm.includes(v)) inc.push(k); if (starts.length >= 40) break; } return starts.concat(inc).slice(0, 40); }
 function renderAc() { const hits = acHits($('q').value), dd = $('ac'); acIdx = -1; if (!hits.length) { dd.style.display = 'none'; dd.innerHTML = ''; return; } dd.innerHTML = hits.map(k => '<div class="ai" data-u="' + esc(k) + '"><b>' + esc(k) + '</b><span>' + esc(S[k][0]) + '</span>' + (D.nbr[k] ? '<i style="color:#10b981;font-size:10px">✓ cluster</i>' : '') + '</div>').join(''); dd.style.display = 'block'; }
@@ -539,6 +554,7 @@ $('q').addEventListener('input', renderAc);
 $('q').addEventListener('keydown', e => { const items = $('ac').querySelectorAll('.ai'); if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (!items.length) return; e.preventDefault(); acIdx = Math.max(0, Math.min(items.length - 1, acIdx + (e.key === 'ArrowDown' ? 1 : -1))); items.forEach((el, i) => el.classList.toggle('sel', i === acIdx)); } else if (e.key === 'Enter') { e.preventDefault(); const v = $('q').value.trim().toUpperCase(); if (acIdx >= 0 && items[acIdx]) pick(items[acIdx].dataset.u); else if (S[v]) pick(v); else if (items.length) pick(items[0].dataset.u); } else if (e.key === 'Escape') $('ac').style.display = 'none'; });
 $('ac').addEventListener('mousedown', e => { const it = e.target.closest('.ai'); if (it) { e.preventDefault(); pick(it.dataset.u); } });
 document.addEventListener('click', e => { if (!e.target.closest('.srch') && !e.target.closest('#q')) $('ac').style.display = 'none'; });
+
 const selected = new Set(); let selMode = false, rulerOn = false, rPts = [], fmtKind = 'excel';
 const rLayer = L.layerGroup().addTo(map); const rLine = L.polyline([], {color:'#f87171', weight:3, dashArray:'8,5', interactive:false});
 function setMode(m) {
@@ -552,6 +568,7 @@ if (selMode) toast('Select: click empty map to draw a polygon (double-click / En
 if (rulerOn) toast('Ruler: click points on the map');
 }
 $('btnSel').addEventListener('click', () => setMode(selMode ? null : 'sel')); $('btnRul').addEventListener('click', () => setMode(rulerOn ? null : 'ruler'));
+
 let sPts = [];
 const sLayer = L.layerGroup().addTo(map);
 const sShape = L.polygon([], {color:'#f59e0b', weight:2, dashArray:'6,4', fillColor:'#f59e0b', fillOpacity:.12, interactive:false});
@@ -583,6 +600,7 @@ sPts = []; drawSel(); toast(n + ' site(s) added - ' + selected.size + ' selected
 $('selFin').addEventListener('click', finishSel);
 $('selUndo').addEventListener('click', () => { sPts.pop(); drawSel(); });
 $('selCancel').addEventListener('click', () => { sPts = []; drawSel(); });
+
 function siteClick(k, e) {
 if (selMode) { L.DomEvent.stopPropagation(e); map.closePopup(); if (sPts.length) addSelPt([S[k][1], S[k][2]]); else toggleSel(k); }
 else if (rulerOn) { L.DomEvent.stopPropagation(e); map.closePopup(); addRulerPoint([S[k][1], S[k][2]]); }
@@ -597,6 +615,7 @@ function updateSelBar() { $('selN').textContent = selected.size + ' selected' + 
 function selectVisible() { if (!cur) return; const b = map.getBounds(); let n = 0; cur.draw.forEach(k => { const r = cur.role[k] || 'other'; if ((r === 'other' && !$('vOther').checked) || (r === 'missing' && !$('vMiss').checked)) return; if (b.contains([S[k][1], S[k][2]])) { selected.add(k); styleSel(k); n++; } }); updateSelBar(); toast(n + ' visible site(s) selected'); }
 function clearSel() { const old = Array.from(selected); selected.clear(); old.forEach(styleSel); updateSelBar(); }
 $('selVis').addEventListener('click', selectVisible); $('selClr').addEventListener('click', clearSel);
+
 const SEL_HDR = ['USID','Site_Name','Latitude','Longitude','Role','HO_ATT','Pct_Sharing','Dist_from_source_mi','Dist_from_source_km'];
 function selRows() { return Array.from(selected).sort().map(k => { const s = S[k], n = cur && cur.NB[k]; const role = cur && k === cur.src ? 'Source' : n ? STAT[n.st][0] : 'Other'; const d = cur && cur.dist[k] != null ? cur.dist[k] : null; return [k, s[0], s[1], s[2], role, n ? n.ho : '', n ? n.pct : '', d != null ? d.toFixed(2) : '', d != null ? (d*1.609344).toFixed(2) : '']; }); }
 function selText(kind) { const rows = selRows(), q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; if (kind === 'usid') return rows.map(r => r[0]).join('\n'); if (kind === 'csv') return [SEL_HDR].concat(rows).map(r => r.map(q).join(',')).join('\n'); return [SEL_HDR].concat(rows).map(r => r.map(v => v == null ? '' : v).join('\t')).join('\n'); }
@@ -608,6 +627,7 @@ $('selCopy').addEventListener('click', openModal); $('selCsv').addEventListener(
 $('mX').addEventListener('click', () => $('mdl').style.display = 'none'); $('mdl').addEventListener('click', e => { if (e.target === $('mdl')) $('mdl').style.display = 'none'; });
 document.querySelector('.fm').addEventListener('click', e => { if (e.target.dataset.f) showFmt(e.target.dataset.f); });
 $('mCopy').addEventListener('click', () => copyText(selText(fmtKind))); $('mDl').addEventListener('click', () => downloadText(selText('csv'), 'selected_sites.csv'));
+
 const dtxt = mi => (mi*1.609344).toFixed(2) + ' km / ' + mi.toFixed(2) + ' mi';
 function drawRuler() { rLayer.clearLayers(); rLine.setLatLngs(rPts); rLayer.addLayer(rLine); let cum = 0, last = 0; rPts.forEach((p, i) => { if (i > 0) { last = hav(rPts[i-1][0], rPts[i-1][1], p[0], p[1]); cum += last; } const m = L.circleMarker(p, {radius:4, color:'#f87171', fillColor:'#fff', fillOpacity:1, weight:2, interactive:false}); if (i > 0) m.bindTooltip(dtxt(cum), {permanent:true, direction:'top', offset:[0, -6], className:'rtip'}); rLayer.addLayer(m); }); $('rTot').textContent = 'Total: ' + dtxt(cum); $('rSeg').textContent = rPts.length > 1 ? 'Last segment: ' + dtxt(last) + ' | ' + rPts.length + ' points' : (rPts.length ? '1 point - click next point' : ''); $('rbox').style.display = (rulerOn || rPts.length) ? 'block' : 'none'; }
 function addRulerPoint(ll) { rPts.push(ll); drawRuler(); }
@@ -619,13 +639,16 @@ if (e.target.tagName === 'INPUT') return;
 if (e.key === 'Enter' && selMode && sPts.length >= 3) finishSel();
 else if (e.key === 'Escape') { if (sPts.length) { sPts = []; drawSel(); } else { setMode(null); $('mdl').style.display = 'none'; } }
 });
+
 (function init() {
 const hash = decodeURIComponent(location.hash.slice(1)).toUpperCase();
 const start = S[hash] ? hash : (CFG.default && S[CFG.default] ? CFG.default : null);
 if (start) loadSource(start);
 else if (ALL.length) { const b = L.latLngBounds(ALL.map(k => [S[k][1], S[k][2]])); map.fitBounds(b); }
 })();
+
 document.getElementById('loading').style.display = 'none';
+
 (function fitFrame() {
 const FOOT = 28;
 function fit() {
@@ -654,49 +677,31 @@ div[data-testid="stVerticalBlock"] { gap:0 !important; }
 .app-hdr { background:linear-gradient(90deg,#0b1d46 0%,#12306b 100%); color:#fff; font-size:18pt; font-weight:600; letter-spacing:.3px;
 padding:8px 22px; height:52px; box-sizing:border-box; display:flex; align-items:center; border-bottom:2px solid #3b82f6; white-space:nowrap; }
 
-/* slim upload bar - compact professional look */
-.st-key-upl { background:#111827; border-bottom:1px solid #1e293b; padding:8px 14px 8px 14px; }
-label[data-testid="stWidgetLabel"] p { font-size:9px !important; color:#94a3b8 !important; margin:0 0 2px 0 !important; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
-
-/* File uploaders - very compact */
+/* slim upload bar */
+.st-key-upl { background:#0d1220; border-bottom:1px solid #1e293b; padding:6px 14px 6px 14px; }
+label[data-testid="stWidgetLabel"] p { font-size:10px !important; color:#94a3b8 !important; margin:0 !important; font-weight:600; text-transform:uppercase; letter-spacing:.6px; }
 .stFileUploader { margin:0 !important; }
-[data-testid="stFileUploaderDropzone"] { min-height:28px !important; padding:2px 6px !important; background:rgba(255,255,255,.04) !important; border:1px solid rgba(255,255,255,.1) !important; border-radius:3px !important; }
+[data-testid="stFileUploaderDropzone"] { min-height:32px !important; padding:2px 8px !important; background:rgba(255,255,255,.05) !important; border:1px solid rgba(255,255,255,.12) !important; border-radius:4px !important; }
 [data-testid="stFileUploaderDropzoneInstructions"] { display:none !important; }
-[data-testid="stFileUploaderDropzone"] small, [data-testid="stFileUploaderDropzone"] span { color:#94a3b8 !important; font-size:10px !important; }
-[data-testid="stFileUploaderFile"] { padding:1px 4px !important; font-size:10px !important; }
-[data-testid="stFileUploaderFile"] button { padding:2px 4px !important; min-height:16px !important; height:16px !important; }
+[data-testid="stFileUploaderDropzone"] small, [data-testid="stFileUploaderDropzone"] span { color:#94a3b8 !important; font-size:11px !important; }
+[data-testid="stFileUploaderFile"] { padding:2px 4px !important; }
 
-/* SIGNUM ID input - clear visible text */
-[data-testid="stTextInput"] input { 
-    background:rgba(255,255,255,.08) !important; 
-    color:#ffffff !important; 
-    border:1px solid rgba(255,255,255,.15) !important;
-    font-size:11px !important; 
-    min-height:28px !important; 
-    height:28px !important; 
-    border-radius:3px !important; 
-    padding:2px 8px !important; 
-}
+/* SIGNUM ID input - matches file uploaders */
+[data-testid="stTextInput"] input { background:rgba(255,255,255,.05) !important; color:#e2e8f0 !important; border:1px solid rgba(255,255,255,.12) !important;
+font-size:11px !important; min-height:32px !important; height:32px !important; border-radius:4px !important; padding:4px 8px !important; }
 [data-testid="stTextInput"] input::placeholder { color:#64748b !important; font-style:italic; }
-[data-testid="stTextInput"] input:focus { border-color:#3b82f6 !important; background:rgba(255,255,255,.12) !important; }
+[data-testid="stTextInput"] input:focus { border-color:#3b82f6 !important; }
 
-/* Go button - compact */
-div.stButton > button { 
-    height:28px !important; 
-    min-height:28px !important; 
-    font-weight:600; 
-    border-radius:3px !important; 
-    font-size:11px !important; 
-    padding: 0 12px !important;
-}
+/* Go button */
+div.stButton > button { height:32px; min-height:32px; font-weight:600; border-radius:4px; font-size:12px; }
 div.stButton > button[kind="primary"] { background:#2563eb; border:1px solid #3b82f6; color:#fff; }
 div.stButton > button:disabled { background:#1e293b !important; color:#475569 !important; border:1px solid #334155 !important; }
 
-.stat-line { font-size:11px; line-height:28px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.stat-line { font-size:11px; line-height:32px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
 /* map frame fills the space between upload bar and footer */
-.stApp iframe { height:calc(100vh - 110px); width:100%; border:0; display:block; }
-.landing { height:calc(100vh - 110px); display:flex; align-items:center; justify-content:center; color:#64748b; text-align:center; }
+.stApp iframe { height:calc(100vh - 120px); width:100%; border:0; display:block; }
+.landing { height:calc(100vh - 120px); display:flex; align-items:center; justify-content:center; color:#64748b; text-align:center; }
 
 /* footer - LEFT aligned */
 .app-ftr { position:fixed; left:0; right:0; bottom:0; height:26px; background:#0d1220; border-top:1px solid #1e293b; color:#cbd5e1; font-size:11px;
@@ -734,20 +739,21 @@ def main():
     st.set_page_config(layout="wide", page_title=APP_TITLE, page_icon="📡", initial_sidebar_state="collapsed")
     st.markdown(PAGE_CSS, unsafe_allow_html=True)
     st.markdown(f'<div class="app-hdr">{APP_TITLE}</div>', unsafe_allow_html=True)
+
     log_url, log_token = secret("LOG_WEBHOOK_URL"), secret("LOG_TOKEN")
-    
+
     st.session_state.setdefault("u_signum", "")
     if "ident" not in st.session_state:
         st.session_state["ident"] = detect_identity()
     ident = st.session_state["ident"]
-    
+
     try:
         bar = st.container(key="upl")
     except TypeError:
         bar = st.container()
-        
+
     with bar:
-        # Compact columns: Site Data | SQL Table | SIGNUM ID | Go | status
+        # 3 uniform columns: Site Data | SQL Table | SIGNUM ID | Go | status
         c1, c2, c3, c4, c5 = cols([3.0, 3.0, 2.2, 0.8, 2.4])
         with c1:
             site_file = st.file_uploader("Site data (CSV)", type=["csv"], key="site")
@@ -761,18 +767,21 @@ def main():
         status = c5.empty()
 
     cur_sig = (sig(site_file), sig(nbr_file))
+
     if go and ready:
         signum = st.session_state.u_signum.strip()
         ph = st.empty()
         try:
-            ph.markdown(overlay("Loading data...", "Reading site file"), unsafe_allow_html=True)
+            ph.markdown(overlay("Loading data ...", "Reading site file"), unsafe_allow_html=True)
             site_df = read_upload(site_file)
-            ph.markdown(overlay("Loading data...", "Reading SQL table"), unsafe_allow_html=True)
+            ph.markdown(overlay("Loading data ...", "Reading SQL table"), unsafe_allow_html=True)
             nbr_df = read_upload(nbr_file)
-            ph.markdown(overlay("Loading data...", "Building the map - this can take a few seconds"), unsafe_allow_html=True)
+            ph.markdown(overlay("Loading data ...", "Building the map - this can take a few seconds"), unsafe_allow_html=True)
+
             # SIGNUM ID captured as user id
             user = {"id": signum, "name": signum, "host": ident["host"] if ident else "", "ip": client_ip(),
                     "email": auth_email(), "src": ident["src"] if ident else "typed"}
+
             payload = build_payload(site_df, nbr_df, user, log_url, log_token)
             st.session_state["map_html"] = render_html(payload)
             st.session_state["loaded_sig"] = cur_sig
@@ -795,7 +804,6 @@ def main():
         msg, color = "Enter SIGNUM ID", "#f59e0b"
     else:
         msg, color = "Ready - click Go", "#60a5fa"
-        
     status.markdown(f'<div class="stat-line" style="color:{color}">{msg}</div>', unsafe_allow_html=True)
 
     if "map_html" in st.session_state:
@@ -806,7 +814,7 @@ def main():
             '<div style="font-size:18px;color:#94a3b8;margin-bottom:8px">Upload both files, enter SIGNUM ID, then press <b style="color:#60a5fa">Go</b></div>'
             '<div style="font-size:12px;line-height:1.7">1. <b>Site data</b> (CSV): USID, coordinates, azimuth, cell<br>2. <b>SQL table</b> (Excel / CSV): neighbour relations and HO data<br>3. <b>SIGNUM ID</b>: your user identifier (captured in usage log)</div></div></div>',
             unsafe_allow_html=True)
-            
+
     # Footer - LEFT aligned
     st.markdown(f'<div class="app-ftr">{SUPPORT_NAME} for any support, please connect with <a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a></div>', unsafe_allow_html=True)
 
