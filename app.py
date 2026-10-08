@@ -17,14 +17,14 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-───────────────────────── CONFIG ─────────────────────────
+# ───────────────────────── CONFIG ─────────────────────────
 APP_TITLE = "Cluster Neighbor Visualization Tool"
 SUPPORT_NAME = "@ Rajesh Dubey"
 SUPPORT_EMAIL = "rajesh.dubey@ericsson.com"
 MAX_DISTANCE_MILES, BUFFER_MILES, CLOSEST_N, ZERO_HO_IS_MISSING, WEDGE_RADIUS_M = 25.0, 1.8, 15, False, 400
 USID_COL, SITE_NAME_COL, LAT_COL, LON_COL, AZIMUTH_COL, CELL_COL = "USID", "ENODEB_New", "LATITUDE", "LONGITUDE", "AZIMUTH", "CELL"
 NBR_SRC_COL, NBR_COL, CLUSTER_NAME_COL, HO_COL, PCT_COL = "USID", "ClusterUSID", "ClusterName", "HO ATT", "% Sharing"
-──────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────
 
 def secret(name):
     """Read from .streamlit/secrets.toml (Streamlit Cloud 'Secrets') or an environment variable."""
@@ -203,7 +203,7 @@ def post_log(url, token, event, user, extra=""):
     except Exception:
         pass
 
-───────────────────────── HTML / JS (map + side panel) ─────────────────────────
+# ───────────────────────── HTML / JS (map + side panel) ─────────────────────────
 HTML = r"""<!DOCTYPE html>
 <html lang="en"> <head> <meta charset="utf-8"> <title>Cluster NBR Map</title>
  <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -347,7 +347,7 @@ input[type="color"]{width:32px;height:24px;border:1px solid #334155;border-radiu
  <div id="mbtn">
  <button class="mb" id="tg" title="Show / hide panel">☰</button>
  <button class="mb" id="btnSel" title="Select sites: click a site, or draw a polygon around many sites">Select</button>
- <button class="mb" id="btnRul" title="Measure distance (km / mi)">📏 Ruler</button>
+ <button class="mb" id="btnRul" title="Measure distance (km / mi)"> Ruler</button>
  </div>
  <div id="rbox">
  <b style="color:#60a5fa;font-size:11px">Distance ruler</b>
@@ -641,7 +641,7 @@ try { window.parent.addEventListener('resize', fit); } catch (e) {}
 })();
 </script></body></html>"""
 
-═══════════════════════════════ UI ═══════════════════════════════
+# ═══════════════════════════════ UI ═══════════════════════════════
 PAGE_CSS = """
 <style>
 #MainMenu, footer, header[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"] { display:none !important; }
