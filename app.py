@@ -632,35 +632,51 @@ div[data-testid="stVerticalBlock"] { gap:0 !important; }
 padding:8px 22px; height:52px; box-sizing:border-box; display:flex; align-items:center; border-bottom:2px solid #3b82f6; white-space:nowrap; }
 
 /* Compact input panel - two rows like screenshot */
-.input-panel { background:#1a1a1a; border-bottom:1px solid #333; padding:4px 10px; }
-.input-row { display:flex; align-items:center; gap:6px; margin:2px 0; flex-wrap:wrap; }
-.input-label { font-size:9px; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:.5px; min-width:70px; }
+.input-panel { background:#1a1a1a; border-bottom:1px solid #333; padding:6px 10px; }
+.input-row { display:flex; align-items:flex-end; gap:8px; margin:3px 0; flex-wrap:nowrap; }
+.input-label { font-size:9px; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:.5px; margin-bottom:2px; }
+
+/* Compact controls */
+.compact-control { display:flex; flex-direction:column; }
+.compact-control label { font-size:9px; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:.5px; margin-bottom:2px; }
 
 /* File uploaders - very compact */
 .stFileUploader { margin:0 !important; }
-[data-testid="stFileUploaderDropzone"] { min-height:20px !important; padding:1px 4px !important; background:#2a2a2a !important; border:1px solid #444 !important; border-radius:2px !important; }
+[data-testid="stFileUploaderDropzone"] { min-height:22px !important; padding:2px 6px !important; background:#2a2a2a !important; border:1px solid #444 !important; border-radius:2px !important; }
 [data-testid="stFileUploaderDropzoneInstructions"] { display:none !important; }
 [data-testid="stFileUploaderDropzone"] small, [data-testid="stFileUploaderDropzone"] span { color:#94a3b8 !important; font-size:9px !important; }
 [data-testid="stFileUploaderFile"] { padding:1px 3px !important; font-size:9px !important; }
 [data-testid="stFileUploaderFile"] button { padding:1px 3px !important; min-height:14px !important; height:14px !important; font-size:9px !important; }
 
-/* SIGNUM ID input - clear visible text */
-.signum-input { background:#2a2a2a !important; border:1px solid #444 !important; color:#fff !important; font-size:10px !important; 
-padding:2px 6px !important; border-radius:2px !important; height:20px !important; min-height:20px !important; }
-.signum-input::placeholder { color:#666 !important; font-style:italic; }
-.signum-input:focus { border-color:#3b82f6 !important; outline:none !important; }
+/* Text inputs - compact */
+.stTextInput input { background:#2a2a2a !important; border:1px solid #444 !important; color:#fff !important; font-size:10px !important; 
+padding:2px 6px !important; border-radius:2px !important; height:22px !important; min-height:22px !important; }
+.stTextInput input::placeholder { color:#666 !important; font-style:italic; }
+.stTextInput input:focus { border-color:#3b82f6 !important; outline:none !important; }
 
-/* Go button - 60% reduced height */
+/* Select inputs - compact */
+.stSelectbox select { background:#2a2a2a !important; border:1px solid #444 !important; color:#fff !important; font-size:10px !important; 
+padding:2px 6px !important; border-radius:2px !important; height:22px !important; min-height:22px !important; }
+
+/* Number inputs - compact */
+.stNumberInput input { background:#2a2a2a !important; border:1px solid #444 !important; color:#fff !important; font-size:10px !important; 
+padding:2px 6px !important; border-radius:2px !important; height:22px !important; min-height:22px !important; }
+
+/* Date inputs - compact */
+.stDateInput input { background:#2a2a2a !important; border:1px solid #444 !important; color:#fff !important; font-size:10px !important; 
+padding:2px 6px !important; border-radius:2px !important; height:22px !important; min-height:22px !important; }
+
+/* Go button - compact */
 .go-btn { background:#2563eb !important; border:1px solid #3b82f6 !important; color:#fff !important; font-size:10px !important; 
-font-weight:600 !important; padding:2px 10px !important; height:20px !important; min-height:20px !important; border-radius:2px !important; cursor:pointer !important; }
+font-weight:600 !important; padding:2px 10px !important; height:22px !important; min-height:22px !important; border-radius:2px !important; cursor:pointer !important; }
 .go-btn:hover { background:#1d4ed8 !important; }
 .go-btn:disabled { background:#1e293b !important; color:#475569 !important; border:1px solid #334155 !important; cursor:not-allowed !important; }
 
-.stat-line { font-size:10px; line-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#10b981; }
+.stat-line { font-size:10px; line-height:22px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#10b981; }
 
 /* Map frame */
-.stApp iframe { height:calc(100vh - 90px); width:100%; border:0; display:block; }
-.landing { height:calc(100vh - 90px); display:flex; align-items:center; justify-content:center; color:#64748b; text-align:center; }
+.stApp iframe { height:calc(100vh - 100px); width:100%; border:0; display:block; }
+.landing { height:calc(100vh - 100px); display:flex; align-items:center; justify-content:center; color:#64748b; text-align:center; }
 
 /* Footer */
 .app-ftr { position:fixed; left:0; right:0; bottom:0; height:26px; background:#0d1220; border-top:1px solid #1e293b; color:#cbd5e1; font-size:11px;
@@ -708,34 +724,89 @@ def main():
     # Compact input panel - two rows like screenshot
     st.markdown('<div class="input-panel">', unsafe_allow_html=True)
     
-    # Row 1: File uploads
+    # Row 1
     st.markdown('<div class="input-row">', unsafe_allow_html=True)
-    c1, c2 = cols([3, 3])
+    c1, c2, c3, c4, c5, c6, c7, c8 = cols([1.2, 1.5, 1.2, 1.2, 1.2, 1.2, 1.2, 0.8])
+    
     with c1:
-        st.markdown('<span class="input-label">Site Data:</span>', unsafe_allow_html=True)
-        site_file = st.file_uploader("", type=["csv"], key="site", label_visibility="collapsed")
+        st.markdown('<div class="compact-control"><label>Input Type</label></div>', unsafe_allow_html=True)
+        input_type = st.selectbox("", ["USID/Site IDs"], key="input_type", label_visibility="collapsed")
+    
     with c2:
-        st.markdown('<span class="input-label">SQL Table:</span>', unsafe_allow_html=True)
-        nbr_file = st.file_uploader("", type=["xlsx", "xls", "csv"], key="nbr", label_visibility="collapsed")
+        st.markdown('<div class="compact-control"><label>USID/Site IDs</label></div>', unsafe_allow_html=True)
+        usid_input = st.text_input("", key="usid_input", placeholder="87658", label_visibility="collapsed")
+    
+    with c3:
+        st.markdown('<div class="compact-control"><label>Neighbor within</label></div>', unsafe_allow_html=True)
+        neighbor_within = st.number_input("", value=24, key="neighbor_within", label_visibility="collapsed")
+    
+    with c4:
+        st.markdown('<div class="compact-control"><label>Start Date</label></div>', unsafe_allow_html=True)
+        start_date = st.date_input("", key="start_date", label_visibility="collapsed")
+    
+    with c5:
+        st.markdown('<div class="compact-control"><label>End Date</label></div>', unsafe_allow_html=True)
+        end_date = st.date_input("", key="end_date", label_visibility="collapsed")
+    
+    with c6:
+        st.markdown('<div class="compact-control"><label>CS Latting</label></div>', unsafe_allow_html=True)
+        cs_latting = st.selectbox("", ["ATOLL"], key="cs_latting", label_visibility="collapsed")
+    
+    with c7:
+        st.markdown('<div class="compact-control"><label>Output</label></div>', unsafe_allow_html=True)
+        output_type = st.selectbox("", ["map"], key="output_type", label_visibility="collapsed")
+    
+    with c8:
+        st.markdown('<div class="compact-control"><label>&nbsp;</label></div>', unsafe_allow_html=True)
+        go = st.button("Go", key="go", use_container_width=True)
+    
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Row 2: SIGNUM ID and Go button
+    # Row 2
     st.markdown('<div class="input-row">', unsafe_allow_html=True)
-    c3, c4, c5 = cols([3, 1, 2])
-    with c3:
-        st.markdown('<span class="input-label">SIGNUM ID:</span>', unsafe_allow_html=True)
+    c9, c10, c11, c12, c13, c14 = cols([2.0, 2.0, 1.5, 1.2, 1.5, 1.0])
+    
+    with c9:
+        st.markdown('<div class="compact-control"><label>Enter USID or eNB ID/s</label></div>', unsafe_allow_html=True)
         signum_input = st.text_input("", key="u_signum", placeholder="Enter SIGNUM ID", label_visibility="collapsed")
-    with c4:
-        ready = bool(site_file and nbr_file and st.session_state.u_signum.strip())
-        go = st.button("▶ Go", type="primary", disabled=not ready, use_container_width=True, key="go")
-    with c5:
-        status = st.empty()
+    
+    with c10:
+        st.markdown('<div class="compact-control"><label>Quick Filter</label></div>', unsafe_allow_html=True)
+        quick_filter = st.text_input("", key="quick_filter", placeholder="Select/Enter Cells", label_visibility="collapsed")
+    
+    with c11:
+        st.markdown('<div class="compact-control"><label>Face/Cell</label></div>', unsafe_allow_html=True)
+        face_cell = st.selectbox("", ["5G SRSRP"], key="face_cell", label_visibility="collapsed")
+    
+    with c12:
+        st.markdown('<div class="compact-control"><label>CellSize</label></div>', unsafe_allow_html=True)
+        cell_size = st.number_input("", value=6, key="cell_size", label_visibility="collapsed")
+    
+    with c13:
+        st.markdown('<div class="compact-control"><label>Warehouse</label></div>', unsafe_allow_html=True)
+        warehouse = st.selectbox("", ["Medium"], key="warehouse", label_visibility="collapsed")
+    
+    with c14:
+        st.markdown('<div class="compact-control"><label>&nbsp;</label></div>', unsafe_allow_html=True)
+        custom = st.checkbox("custom", key="custom")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # File upload row
+    st.markdown('<div class="input-row" style="margin-top:4px;">', unsafe_allow_html=True)
+    c15, c16 = cols([3, 3])
+    with c15:
+        st.markdown('<div class="compact-control"><label>Site Data (CSV)</label></div>', unsafe_allow_html=True)
+        site_file = st.file_uploader("", type=["csv"], key="site", label_visibility="collapsed")
+    with c16:
+        st.markdown('<div class="compact-control"><label>SQL Table (XLSX/CSV)</label></div>', unsafe_allow_html=True)
+        nbr_file = st.file_uploader("", type=["xlsx", "xls", "csv"], key="nbr", label_visibility="collapsed")
     st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown('</div>', unsafe_allow_html=True)
 
     cur_sig = (sig(site_file), sig(nbr_file))
-    if go and ready:
+    if go and site_file and nbr_file and st.session_state.u_signum.strip():
         signum = st.session_state.u_signum.strip()
         ph = st.empty()
         try:
@@ -769,7 +840,7 @@ def main():
     else:
         msg, color = "Ready - click Go", "#60a5fa"
         
-    status.markdown(f'<div class="stat-line" style="color:{color};padding:2px 10px;">{msg}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="stat-line" style="color:{color};padding:2px 10px;">{msg}</div>', unsafe_allow_html=True)
 
     if "map_html" in st.session_state:
         show_map(st.session_state["map_html"])
