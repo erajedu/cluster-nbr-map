@@ -1,130 +1,231 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import math
+"""
+Cluster Neighbor Visualization Tool  -  Streamlit app
+
+Layout (top -> bottom):  header  |  upload bar (Site CSV, SQL table, Name, User ID, [Go])  |  sidebar + map  |  footer
+Flow: upload both files, enter Name + User ID, press  Go  -> loading message -> map.
+
+Usage logging (who searched which USID, when): set LOG_WEBHOOK_URL (+ LOG_TOKEN) in .streamlit/secrets.toml
+ (see usage_log_apps_script.gs for a free Google-Sheet receiver). Leave empty to disable.
+"""
+import getpass
+import io
+import ipaddress
 import json
+import math
+import os
+import socket
+
+import numpy as np
+import pandas as pd
+import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(layout="wide", page_title="Cluster NBR Map", initial_sidebar_state="collapsed")
+# ───────────────────────── CONFIG ─────────────────────────
+APP_TITLE = "Cluster Neighbor Visualization Tool"
+SUPPORT_NAME = "@ Rajesh Dubey"
+SUPPORT_EMAIL = "rajesh.dubey@ericsson.com"
 
-# ─ Hide Streamlit chrome completely ──
-st.markdown("""
-<style>
-    .block-container { padding: 0 !important; max-width: 100% !important; }
-    .stApp { background: #0a0e1a !important; }
-    #MainMenu, footer, .stDecoration, header[data-testid="stHeader"] { display: none !important; }
-    .stFileUploader { margin: 0 !important; padding: 0 !important; }
-    .stFileUploader > div { background: transparent !important; border: none !important; padding: 0 !important; }
-    .stFileUploader label { display: none !important; }
-    .stFileUploader [data-testid="stFileUploaderDropzone"] {
-        min-height: 30px !important; padding: 3px 8px !important;
-        background: rgba(255,255,255,0.05) !important;
-        border: 1px solid rgba(255,255,255,0.1) !important;
-        border-radius: 3px !important;
-    }
-    .stFileUploader [data-testid="stFileUploaderDropzone"] p {
-        color: #94a3b8 !important; font-size: 11px !important; margin: 0 !important;
-    }
-    .stFileUploader [data-testid="stFileUploaderInstruction"],
-    .stFileUploader [data-testid="stFileUploaderDropzoneInstructions"] { display: none !important; }
-    .stColumn { padding: 0 2px !important; }
-    .element-container { margin-bottom: 0 !important; }
-    div[data-testid="stVerticalBlock"] > div { margin-bottom: 0 !important; }
-    div[data-testid="stVerticalBlock"] { gap: 0 !important; }
-</style>
-""", unsafe_allow_html=True)
-
-# ── Compact upload bar ──
-site_file = None
-nbr_file = None
-
-st.markdown('<div style="background:#0d1220;border-bottom:1px solid #1e293b;padding:6px 12px;display:flex;align-items:center;gap:8px;height:42px;box-sizing:border-box">', unsafe_allow_html=True)
-c1, c2, c3 = st.columns([0.42, 0.42, 0.16], gap="small")
-with c1:
-    st.markdown('<span style="color:#64748b;font-size:11px"> Site Data:</span>', unsafe_allow_html=True)
-    site_file = st.file_uploader("", type=["csv"], key="site", label_visibility="collapsed")
-with c2:
-    st.markdown('<span style="color:#64748b;font-size:11px">📊 SQL Table:</span>', unsafe_allow_html=True)
-    nbr_file = st.file_uploader("", type=["xlsx", "xls", "csv"], key="nbr", label_visibility="collapsed")
-with c3:
-    status = "✓ Both files loaded" if (site_file and nbr_file) else "Upload files above"
-    color = "#10b981" if (site_file and nbr_file) else "#64748b"
-    st.markdown(f'<div style="color:{color};font-size:11px;text-align:right">{status}</div>', unsafe_allow_html=True)
-st.markdown('</div>', unsafe_allow_html=True)
-
-# ─ Config & Helpers ──
 MAX_DISTANCE_MILES, BUFFER_MILES, CLOSEST_N, ZERO_HO_IS_MISSING, WEDGE_RADIUS_M = 25.0, 1.8, 15, False, 400
 USID_COL, SITE_NAME_COL, LAT_COL, LON_COL, AZIMUTH_COL, CELL_COL = "USID", "ENODEB_New", "LATITUDE", "LONGITUDE", "AZIMUTH", "CELL"
 NBR_SRC_COL, NBR_COL, CLUSTER_NAME_COL, HO_COL, PCT_COL = "USID", "ClusterUSID", "ClusterName", "HO ATT", "% Sharing"
+# ──────────────────────────────────────────────────────────
+
+
+def secret(name):
+    """Read from .streamlit/secrets.toml (Streamlit Cloud 'Secrets') or an environment variable."""
+    try:
+        v = st.secrets.get(name)
+        if v:
+            return str(v)
+    except Exception:
+        pass
+    return os.environ.get(name, "")
+
+
+def auth_email():
+    """Viewer e-mail when the app is private / login-protected on Streamlit Cloud (empty for public apps)."""
+    for attr in ("user", "experimental_user"):
+        try:
+            u = getattr(st, attr, None)
+            e = getattr(u, "email", None) or (u.get("email") if hasattr(u, "get") else None)
+            if e:
+                return str(e)
+        except Exception:
+            pass
+    return ""
+
+
+def client_ip():
+    """IP address of the browser that is talking to this app ('' if unknown)."""
+    try:
+        ip = getattr(st.context, "ip_address", None)
+        if ip:
+            return str(ip)
+    except Exception:
+        pass
+    try:
+        xff = st.context.headers.get("X-Forwarded-For", "")
+        if xff:
+            return xff.split(",")[0].strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _ip_is(ip, attr):
+    try:
+        return bool(getattr(ipaddress.ip_address(ip), attr))
+    except Exception:
+        return False
+
+
+def windows_display_name():
+    try:
+        import ctypes
+        f, n = ctypes.windll.secur32.GetUserNameExW, ctypes.c_ulong(0)
+        f(3, None, ctypes.byref(n))
+        buf = ctypes.create_unicode_buffer(n.value)
+        f(3, buf, ctypes.byref(n))
+        return buf.value
+    except Exception:
+        return ""
+
+
+def detect_identity():
+    """
+    Who is using the tool?  A browser cannot read the visitor's PC name / Windows login, so:
+      1. app runs on the user's own PC (browser IP is loopback, or RUN_LOCAL=1)  -> OS login + computer name   [src 'local-os']
+      2. app hosted inside the company network (browser IP is private)            -> reverse-DNS host name of the PC + login e-mail if any
+      3. app is private / login-protected on Streamlit Cloud                      -> login e-mail                [src 'login']
+      4. otherwise None -> the page asks the user to type Name + User ID          [src 'typed']
+    """
+    ip, email = client_ip(), auth_email()
+    if secret("RUN_LOCAL") == "1" or _ip_is(ip, "is_loopback"):
+        uid = getpass.getuser()
+        return {"id": uid, "name": windows_display_name() or uid, "host": socket.gethostname(), "ip": ip or "127.0.0.1", "email": email, "src": "local-os"}
+    host = ""
+    if ip and _ip_is(ip, "is_private"):
+        try:
+            host = socket.gethostbyaddr(ip)[0]
+        except Exception:
+            host = ""
+    if email:
+        return {"id": email.split("@")[0], "name": email, "host": host, "ip": ip, "email": email, "src": "login"}
+    if host:
+        return {"id": host.split(".")[0], "name": host, "host": host, "ip": ip, "email": "", "src": "network-host"}
+    return None
+
 
 def norm_id(x):
     s = str(x).strip().upper()
     return s[:-2] if s.endswith(".0") and s[:-2].isdigit() else s
 
+
 def num(v):
-    try: return float(v) if pd.notna(v) else 0.0
-    except: return 0.0
+    try:
+        return float(v) if pd.notna(v) else 0.0
+    except Exception:
+        return 0.0
+
+
+def need_cols(df, cols, label):
+    miss = [c for c in cols if c not in df.columns]
+    if miss:
+        raise ValueError(f"{label}: column(s) {miss} not found. Columns present: {list(df.columns)[:15]}")
+
+
+def read_upload(f):
+    raw = io.BytesIO(f.getvalue())
+    df = pd.read_csv(raw, low_memory=False) if f.name.lower().endswith(".csv") else pd.read_excel(raw)
+    df.columns = df.columns.astype(str).str.strip()
+    return df
+
 
 def load_sites(df):
-    df = df.dropna(subset=[USID_COL])
+    need_cols(df, [USID_COL, LAT_COL, LON_COL, AZIMUTH_COL], "Site file")
+    df = df.dropna(subset=[USID_COL]).copy()
     df[USID_COL] = df[USID_COL].map(norm_id)
-    for c in (LAT_COL, LON_COL, AZIMUTH_COL): df[c] = pd.to_numeric(df[c], errors="coerce")
+    for c in (LAT_COL, LON_COL, AZIMUTH_COL):
+        df[c] = pd.to_numeric(df[c], errors="coerce")
     df = df.dropna(subset=[LAT_COL, LON_COL])
     if SITE_NAME_COL in df.columns:
         names = df[SITE_NAME_COL].where(df[SITE_NAME_COL].notna(), df[USID_COL]).astype(str).str.strip()
         df["_name"] = names.where(names != "", df[USID_COL])
-    else: df["_name"] = df[USID_COL]
-    return df, df.groupby(USID_COL, sort=False).agg(lat=(LAT_COL,"first"), lon=(LON_COL,"first"), name=("_name","first"))
+    else:
+        df["_name"] = df[USID_COL]
+    return df, df.groupby(USID_COL, sort=False).agg(lat=(LAT_COL, "first"), lon=(LON_COL, "first"), name=("_name", "first"))
+
 
 def load_nbr_table(df):
-    t = df.dropna(subset=[NBR_SRC_COL, NBR_COL])
+    need_cols(df, [NBR_SRC_COL, NBR_COL], "SQL table")
+    t = df.dropna(subset=[NBR_SRC_COL, NBR_COL]).copy()
     t[NBR_SRC_COL] = t[NBR_SRC_COL].map(norm_id)
     t[NBR_COL] = t[NBR_COL].map(norm_id)
     return t
+
 
 def select_sites(sites, tbl, sources):
     lat, lon = sites.lat.values, sites.lon.values
     keep = np.zeros(len(sites), dtype=bool)
     dlat = MAX_DISTANCE_MILES / 69.0
     for s in sources:
-        if s not in sites.index: continue
+        if s not in sites.index:
+            continue
         la, lo = sites.at[s, "lat"], sites.at[s, "lon"]
         dlon = dlat / max(math.cos(math.radians(la)), 0.01)
         keep |= (np.abs(lat - la) <= dlat) & (np.abs(lon - lo) <= dlon)
     keep |= sites.index.isin(set(tbl.loc[tbl[NBR_SRC_COL].isin(sources), NBR_COL]))
     return sites[keep]
 
-def build_payload(df, tbl):
+
+def build_payload(df, tbl, user=None, log_url="", log_token=""):
     df, sites = load_sites(df)
     tbl = load_nbr_table(tbl)
     sources = list(tbl[NBR_SRC_COL].unique())
     keep = select_sites(sites, tbl, sources)
     sub = df[df[USID_COL].isin(keep.index)]
-    cell_series = sub[CELL_COL] if CELL_COL in sub.columns else pd.Series([None]*len(sub), index=sub.index)
+    cell_series = sub[CELL_COL] if CELL_COL in sub.columns else pd.Series([None] * len(sub), index=sub.index)
     cells = {}
     for u, c, az in zip(sub[USID_COL], cell_series, sub[AZIMUTH_COL]):
         if pd.notna(az):
             label = str(c).strip() if pd.notna(c) and str(c).strip() else f"{u}_Sector"
             cells.setdefault(u, []).append([label, float(az)])
-    site_json = {u: [r.name, round(float(r.lat),6), round(float(r.lon),6), cells.get(u,[])] for u, r in zip(keep.index, keep.itertuples())}
+    site_json = {u: [r.name, round(float(r.lat), 6), round(float(r.lon), 6), cells.get(u, [])] for u, r in zip(keep.index, keep.itertuples())}
     has_ho, has_pct = HO_COL in tbl.columns, PCT_COL in tbl.columns
     nbr_json = {}
     for src, g in tbl.groupby(NBR_SRC_COL, sort=False):
         cname = str(g[CLUSTER_NAME_COL].dropna().iloc[0]).strip() if CLUSTER_NAME_COL in g.columns and g[CLUSTER_NAME_COL].notna().any() else ""
-        hos = g[HO_COL].map(num) if has_ho else [None]*len(g)
-        pcts = g[PCT_COL].map(num) if has_pct else [None]*len(g)
-        nbr_json[src] = [cname, [[n,h,p] for n,h,p in zip(g[NBR_COL], hos, pcts)]]
-    return {"cfg":{"buffer":BUFFER_MILES,"radiusM":WEDGE_RADIUS_M,"maxMiles":MAX_DISTANCE_MILES,"closestN":CLOSEST_N,"zeroHo":ZERO_HO_IS_MISSING,"default":None},"sites":site_json,"nbr":nbr_json}
+        hos = g[HO_COL].map(num) if has_ho else [None] * len(g)
+        pcts = g[PCT_COL].map(num) if has_pct else [None] * len(g)
+        nbr_json[src] = [cname, [[n, h, p] for n, h, p in zip(g[NBR_COL], hos, pcts)]]
+    cfg = {"buffer": BUFFER_MILES, "radiusM": WEDGE_RADIUS_M, "maxMiles": MAX_DISTANCE_MILES, "closestN": CLOSEST_N,
+           "zeroHo": ZERO_HO_IS_MISSING, "default": None, "user": user or {}, "logUrl": log_url, "logToken": log_token}
+    return {"cfg": cfg, "sites": site_json, "nbr": nbr_json}
 
-# ── Process & Render ──
-if site_file and nbr_file:
+
+def render_html(payload):
+    data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    return HTML.replace("__DATA__", data)
+
+
+def post_log(url, token, event, user, extra=""):
+    """Server-side log line (used for the 'go' event). Never breaks the app."""
+    if not url:
+        return
     try:
-        site_df = pd.read_csv(site_file, low_memory=False)
-        nbr_df = pd.read_csv(nbr_file, low_memory=False) if nbr_file.name.lower().endswith('.csv') else pd.read_excel(nbr_file)
-        payload = build_payload(site_df, nbr_df)
-        data = json.dumps(payload, ensure_ascii=False, separators=(",",":")).replace("</","<\\/")
+        import requests
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        body = {"token": token, "event": event, "ts_utc": now.isoformat(), "ts_local": now.astimezone().strftime("%d/%m/%Y, %H:%M:%S"),
+                "user_id": user.get("id", ""), "name": user.get("name", ""), "computer_name": user.get("host", ""), "ip": user.get("ip", ""),
+                "id_source": user.get("src", ""), "auth_email": user.get("email", ""), "extra": extra}
+        requests.post(url, data=json.dumps(body), headers={"Content-Type": "text/plain;charset=utf-8"}, timeout=6)
+    except Exception:
+        pass
 
-        HTML = r"""<!DOCTYPE html>
+
+# ───────────────────────── HTML / JS (map + side panel) ─────────────────────────
+HTML = r"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>Cluster NBR Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -132,11 +233,11 @@ if site_file and nbr_file:
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;color:#e2e8f0;background:#0a0e1a;overflow:hidden}
-#app{display:flex;flex-direction:column;height:100vh}
+#app{display:flex;flex-direction:column;height:100%}
 #hdr{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff;font-size:20px;font-weight:600;padding:10px 20px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
 #hdr .sub{font-size:11px;opacity:0.85;font-weight:400}
 #wrap{display:flex;flex:1;min-height:0;overflow:hidden}
-#side{width:300px;min-width:300px;max-width:300px;overflow-y:auto;background:#0d1220;border-right:1px solid #1e293b;padding:12px;flex-shrink:0}
+#side{width:clamp(220px,14vw,290px);min-width:220px;overflow-y:auto;background:#0d1220;border-right:1px solid #1e293b;padding:10px;flex-shrink:0}
 #side::-webkit-scrollbar{width:5px}#side::-webkit-scrollbar-track{background:#0a0e1a}#side::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
 #mapbox{flex:1;position:relative;background:#020617;min-width:0}
 #map{height:100%;width:100%;--fs:13px}
@@ -175,20 +276,20 @@ input[type="color"]{width:32px;height:24px;border:1px solid #334155;border-radiu
 .stat-box b{display:block;font-size:16px;font-weight:700}
 .stat-box span{font-size:9px;color:#94a3b8;text-transform:uppercase}
 
-#mbtn{position:absolute;top:8px;left:8px;z-index:1000;display:flex;gap:4px}
+#mbtn{position:absolute;top:10px;left:58px;z-index:1000;display:flex;gap:4px}
 .mb{background:#0d1220;color:#e2e8f0;box-shadow:0 2px 6px rgba(0,0,0,0.5);border:1px solid #334155;padding:5px 10px;font-size:11px;border-radius:4px;cursor:pointer}
 .mb:hover{background:#1e293b;border-color:#60a5fa}.mb.on{background:#3b82f6;color:#fff;border-color:#3b82f6}
 
-#rbox{position:absolute;top:8px;right:8px;background:#0d1220;border:1px solid #334155;border-radius:6px;padding:10px 12px;z-index:1000;display:none;min-width:220px;box-shadow:0 4px 12px rgba(0,0,0,0.5)}
+#rbox{position:absolute;top:56px;right:10px;background:#0d1220;border:1px solid #334155;border-radius:6px;padding:10px 12px;z-index:1000;display:none;min-width:220px;box-shadow:0 4px 12px rgba(0,0,0,0.5)}
 .rtip{background:#0d1220;border:1px solid #f87171;color:#f87171;font-weight:bold;font-size:10px;padding:2px 5px;border-radius:3px}
 
-#selbar{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#0d1220;border:1px solid #334155;border-radius:6px;padding:8px 12px;z-index:1000;display:none;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,0.5)}
-#selN{font-weight:bold;color:#f59e0b;min-width:70px;font-size:11px}
+#selbar{position:absolute;bottom:56px;left:50%;transform:translateX(-50%);background:#0d1220;border:1px solid #334155;border-radius:6px;padding:8px 12px;z-index:1000;display:none;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(0,0,0,0.5)}
+#selN{font-weight:bold;color:#f59e0b;min-width:70px;font-size:11px}#selbar .btn{flex:none}#drawCtl{display:none;gap:6px;align-items:center}
 
 #toast{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#10b981;color:#fff;padding:8px 16px;border-radius:5px;z-index:1000;display:none;font-weight:500;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.4)}
 
 .lbl{font-weight:600;font-size:var(--fs);white-space:nowrap;text-shadow:1px 1px 3px #000,-1px -1px 3px #000,1px -1px 3px #000,-1px 1px 3px #000}
-.lbl-source{font-size:calc(var(--fs) + 2px)}.lbl-other{display:none}.zhi .lbl-other{display:block}.nolbl .lbl{display:none!important}
+.lbl-source{font-size:calc(var(--fs) + 2px)}.lbl-other{display:none}.zhi .lbl-other{display:block}.nolbl .lbl{display:none!important}.allblue .lbl-ok,.allblue .lbl-missing,.allblue .lbl-other{color:#3b82f6!important}
 
 .vh{width:10px;height:10px;background:#fff;border:2px solid #60a5fa;border-radius:50%;cursor:move}
 .crosshair,.crosshair.leaflet-grab{cursor:crosshair!important}
@@ -218,6 +319,10 @@ input[type="color"]{width:32px;height:24px;border:1px solid #334155;border-radiu
 .pills button{border-radius:10px;padding:2px 8px;font-size:9px;border:1px solid #334155;background:#1e293b;color:#cbd5e1;cursor:pointer}
 .pills button.on{background:#3b82f6;color:#fff;border-color:#3b82f6}
 
+#loading{position:fixed;inset:0;background:rgba(10,14,26,.88);z-index:9000;display:flex;align-items:center;justify-content:center}
+.ov-box{text-align:center;color:#e2e8f0}.ov-t{font-size:16px;font-weight:600;margin-top:14px}.ov-s{font-size:11px;color:#94a3b8;margin-top:4px}
+.spin{width:46px;height:46px;border:5px solid #1e293b;border-top-color:#3b82f6;border-radius:50%;margin:0 auto;animation:sp 0.9s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
 /* Config panel */
 .cfg-panel{background:#1e293b;border:1px solid #334155;border-radius:4px;margin-bottom:12px;overflow:hidden}
 .cfg-header{background:#334155;padding:8px 10px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:600;color:#60a5fa}
@@ -226,27 +331,11 @@ input[type="color"]{width:32px;height:24px;border:1px solid #334155;border-radiu
 .cfg-content input[type=text]{width:100%;padding:5px 7px;background:#0a0e1a;border:1px solid #334155;border-radius:3px;color:#e2e8f0;font-size:11px;box-sizing:border-box;margin:4px 0}
 </style></head><body>
 <div id="app">
-<div id="hdr"><span>Cluster Neighbor Visualization Tool</span><span class="sub">@Rajesh Dubey | rajesh.dubey@ericsson.com</span></div>
 <div id="wrap">
 <div id="side">
-
-  <!-- Collapsible Config Panel -->
-  <div class="cfg-panel">
-    <div class="cfg-header" onclick="toggleCfg()"><span>📁 Data Source Configuration</span><span id="cfgToggle">▼</span></div>
-    <div class="cfg-content" id="cfgContent">
-      <div class="ctrl-label">Site Data File Path</div>
-      <input type="text" id="cfgSite" placeholder="Local path or SharePoint link">
-      <div class="ctrl-label">Neighbor SQL Table Path</div>
-      <input type="text" id="cfgNbr" placeholder="Local path or SharePoint link">
-      <div class="ctrl-label">Use SharePoint Public Link</div>
-      <select id="cfgSP"><option value="no">No - Use Local Paths</option><option value="yes">Yes - SharePoint Public Links</option></select>
-      <button class="btn btn-primary" onclick="saveCfg()" style="margin-top:8px;width:100%">💾 Update Configuration</button>
-    </div>
-  </div>
-
   <div class="search-label">PROVIDE USID</div>
-  <div style="position:relative">
-    <input id="q" placeholder="Enter USID or site name" autocomplete="off">
+  <div style="position:relative" class="srch">
+    <input id="q" title="Provide USID" placeholder="Enter USID / site name" autocomplete="off">
     <div id="ac"></div>
   </div>
   <div id="empty" style="color:#64748b;font-size:10px;margin-top:4px">Type a USID above, or click any site on the map.</div>
@@ -257,39 +346,39 @@ input[type="color"]{width:32px;height:24px;border:1px solid #334155;border-radiu
     <div class="src-info" id="tInfo"></div>
 
     <div class="section-title">POLYGON CONTROLS</div>
-    <div class="ctrl-row"><label><input type="checkbox" id="chkShow" checked> <b>Show polygon boundary</b></label></div>
-    <div class="ctrl-row"><label><input type="checkbox" id="chkEdit"> <b style="color:#60a5fa">Enable polygon editing</b></label></div>
+    <div class="ctrl-row"><label><input type="checkbox" id="chkShow" checked> <b>Show polygon</b></label></div>
+    <div class="ctrl-row"><label><input type="checkbox" id="chkEdit"> <b style="color:#60a5fa">Enable editing</b></label></div>
     <div class="hint">Drag handles, click line to add, right-click to delete</div>
-    <div class="ctrl-label">Buffer: <b id="bufVal"></b> miles</div>
+    <div class="ctrl-label">Buffer: <b id="bufVal"></b> mi</div>
     <input type="range" id="buf" min="0" max="6" step="0.1">
-    <div class="ctrl-label">Line thickness: <b id="wVal">3</b> px</div>
+    <div class="ctrl-label">Line: <b id="wVal">3</b> px</div>
     <input type="range" id="pw" min="1" max="10" step="1" value="3">
     <select id="ps"><option value="" selected>Solid</option><option value="6, 6">Dashed</option><option value="2, 4">Dotted</option></select>
-    <div class="ctrl-row"><span style="color:#94a3b8">Line colour</span><input type="color" id="pc" value="#3b82f6"></div>
-    <div class="ctrl-label">Keep these sites OUTSIDE the polygon:</div>
-    <select id="excl"><option value="missing" selected>Missing / suggested sites (only defined NBRs inside)</option><option value="all">All non-defined sites</option><option value="none">None (plain convex hull)</option></select>
-    <div class="btn-row"><button class="btn" id="btnRebuild">Rebuild from ticked sites</button><button class="btn" id="btnFit">Fit view</button></div>
+    <div class="ctrl-row"><span style="color:#94a3b8">Colour</span><input type="color" id="pc" value="#3b82f6"></div>
+    <div class="ctrl-label">Keep OUTSIDE:</div>
+    <select id="excl"><option value="missing" selected>Missing / suggested</option><option value="all">All non-defined sites</option><option value="none">None (convex hull)</option></select>
+    <div class="btn-row"><button class="btn" id="btnRebuild">Rebuild</button><button class="btn" id="btnFit">Fit view</button></div>
     <div id="inside"></div>
 
     <div class="section-title">VIEW CONTROLS</div>
-    <div class="ctrl-label">Sector size: <b id="sVal">1.0</b> x</div>
+    <div class="ctrl-label">Sector: <b id="sVal">1.0</b> x</div>
     <input type="range" id="ss" min="0.5" max="6" step="0.1" value="1">
-    <div class="ctrl-label">Node name font: <b id="fVal">13</b> px</div>
+    <div class="ctrl-label">Font: <b id="fVal">13</b> px</div>
     <input type="range" id="fs" min="8" max="28" step="1" value="13">
-    <div class="ctrl-row"><label><input type="checkbox" id="vLines" checked> HO lines (source → NBR)</label></div>
-    <div class="ctrl-row"><label><input type="checkbox" id="vMiss" checked> Missing / suggested sites</label></div>
+    <div class="ctrl-row"><label><input type="checkbox" id="vLines" checked> HO lines</label></div>
+    <div class="ctrl-row"><label><input type="checkbox" id="vMiss" checked> Missing sites</label></div>
     <div class="ctrl-row"><label><input type="checkbox" id="vOther" checked> Other sites</label></div>
-    <div class="ctrl-row"><label><input type="checkbox" id="vLbl" checked> Site labels</label></div>
-    <div class="ctrl-row"><label><input type="checkbox" id="vBlue"> <b>All sites blue</b> (except source)</label></div>
+    <div class="ctrl-row"><label><input type="checkbox" id="vLbl" checked> Labels</label></div>
+    <div class="ctrl-row"><label><input type="checkbox" id="vBlue"> <b>All blue</b> <span style="color:#64748b">(except source)</span></label></div>
 
-    <div class="section-title">NEIGHBOUR SUMMARY</div>
+    <div class="section-title">SUMMARY</div>
     <div class="stats" id="stats"></div>
     <div id="warn"></div>
 
-    <div class="section-title">NEIGHBOURS <span style="font-weight:normal;color:#64748b">(tick = include in polygon)</span></div>
+    <div class="section-title">NEIGHBOURS <span style="font-weight:normal;color:#64748b">(tick = in polygon)</span></div>
     <div class="pills" id="pills"></div>
     <div id="list"></div>
-    <div class="btn-row"><button class="btn" id="btnCsv">Export missing (this source)</button><button class="btn" id="btnCsvAll">Export missing (all sources)</button></div>
+    <div class="btn-row"><button class="btn" id="btnCsv">Export missing</button><button class="btn" id="btnCsvAll">Export all</button></div>
 
     <div class="section-title">LEGEND</div>
     <div style="font-size:11px;color:#cbd5e1">
@@ -306,9 +395,9 @@ input[type="color"]{width:32px;height:24px;border:1px solid #334155;border-radiu
 <div id="mapbox">
   <div id="map"></div>
   <div id="mbtn">
-    <button class="mb" id="tg">☰ Panel</button>
-    <button class="mb" id="btnSel">☑ Select sites</button>
-    <button class="mb" id="btnRul">📏 Ruler</button>
+    <button class="mb" id="tg" title="Show / hide panel">☰</button>
+    <button class="mb" id="btnSel" title="Select sites: click a site, or draw a polygon around many sites">⬚ Select</button>
+    <button class="mb" id="btnRul" title="Measure distance (km / mi)">📏 Ruler</button>
   </div>
   <div id="rbox">
     <b style="color:#60a5fa;font-size:11px">Distance ruler</b>
@@ -319,6 +408,7 @@ input[type="color"]{width:32px;height:24px;border:1px solid #334155;border-radiu
   </div>
   <div id="selbar">
     <span id="selN">0 selected</span>
+    <span id="drawCtl"><button class="btn btn-primary" id="selFin">Close polygon</button><button class="btn" id="selUndo">Undo point</button><button class="btn" id="selCancel">Cancel</button></span>
     <button class="btn" id="selCopy">Copy</button>
     <button class="btn" id="selCsv">Export CSV</button>
     <button class="btn" id="selVis">Select all visible</button>
@@ -327,8 +417,8 @@ input[type="color"]{width:32px;height:24px;border:1px solid #334155;border-radiu
   <div id="toast"></div>
 </div>
 </div>
-<div id="ftr">@Rajesh Dubey, please connect with <a href="mailto:rajesh.dubey@sds.com">rajesh.dubey@sds.com</a> for any support</div>
 </div>
+<div id="loading"><div class="ov-box"><div class="spin"></div><div class="ov-t">Rendering map ...</div><div class="ov-s">Please wait</div></div></div>
 
 <div id="mdl"><div class="mbox">
   <div class="mh"><b>Selected sites</b><button id="mX" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px">✕</button></div>
@@ -351,15 +441,19 @@ const MI = 69.093;
 function hav(la1, lo1, la2, lo2) { const r = Math.PI/180, a = Math.sin((la2-la1)*r/2)**2 + Math.cos(la1*r)*Math.cos(la2*r)*Math.sin((lo2-lo1)*r/2)**2; return 2*3958.8*Math.asin(Math.sqrt(a)); }
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 3000); }
 
-function toggleCfg() {
-  const c = $('cfgContent'), t = $('cfgToggle');
-  if (c.classList.contains('active')) { c.classList.remove('active'); t.textContent = '▼'; }
-  else { c.classList.add('active'); t.textContent = '▲'; }
-}
-function saveCfg() {
-  const s = $('cfgSite').value, n = $('cfgNbr').value, sp = $('cfgSP').value;
-  if (!s || !n) { alert('Please provide both file paths'); return; }
-  alert('Configuration saved!\n\nNote: For SharePoint links, use direct download links (ending in ?download=1).\n\nTo apply backend changes, update the paths in the Python script and re-run.');
+// ── usage logging (Google Sheet web-app / any webhook; no-op when CFG.logUrl is empty) ──
+const USER = CFG.user || {};
+let _lastLog = {k:'', t:0};
+function logEvent(event, usid, via, extra) {
+  if (!CFG.logUrl) return;
+  const k = event + '|' + usid, now = Date.now();
+  if (_lastLog.k === k && now - _lastLog.t < 2000) return;        // ignore double fire
+  _lastLog = {k, t:now};
+  const d = new Date();
+  const body = {token:CFG.logToken || '', event, usid:usid || '', site_name:S[usid] ? S[usid][0] : '', via:via || '',
+    cluster:(D.nbr[usid] && D.nbr[usid][0]) || '', user_id:USER.id || '', name:USER.name || '', computer_name:USER.host || '', ip:USER.ip || '', id_source:USER.src || '', auth_email:USER.email || '',
+    ts_utc:d.toISOString(), ts_local:d.toLocaleString('en-IN', {timeZone:'Asia/Kolkata', hour12:false}), extra:extra || ''};
+  try { fetch(CFG.logUrl, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain;charset=utf-8'}, body:JSON.stringify(body), keepalive:true}).catch(() => {}); } catch (e) {}
 }
 
 function analyse(u) {
@@ -392,7 +486,12 @@ const G = {other:L.layerGroup(), missing:L.layerGroup(), ok:L.layerGroup(), sour
 const LG = {ok:L.layerGroup(), missing:L.layerGroup()};
 Object.values(G).concat(Object.values(LG)).forEach(g => g.addTo(map));
 
-function recolor() { const blue = $('vBlue').checked; const c = role => blue && role !== 'source' ? COL.ok : COL[role]; wedges.forEach(w => w.p.setStyle({fillColor:c(w.role)})); }
+function recolor() {
+  const blue = $('vBlue').checked, c = role => blue && role !== 'source' ? COL.ok : COL[role];
+  wedges.forEach(w => w.p.setStyle({fillColor:c(w.role)}));
+  dots.forEach(d => d.m.setStyle({fillColor:c(d.role)}));
+  mapEl.classList.toggle('allblue', blue);          // labels follow the same colour rule
+}
 function setLayer(g, on) { on ? map.addLayer(g) : map.removeLayer(g); }
 function applyVis() { setLayer(G.other, $('vOther').checked); setLayer(G.missing, $('vMiss').checked); setLayer(LG.ok, $('vLines').checked); setLayer(LG.missing, $('vLines').checked && $('vMiss').checked); mapEl.classList.toggle('nolbl', !$('vLbl').checked); }
 ['vLines','vMiss','vOther','vLbl'].forEach(id => $(id).addEventListener('change', applyVis));
@@ -423,10 +522,11 @@ let cur = null, wedges = [], dots = [], siteLayers = {}, radius = CFG.radiusM, i
 const poly = L.polygon([], {pane:'poly', color:'#3b82f6', weight:3, fill:false, bubblingMouseEvents:false}).addTo(map);
 
 function tip(u, extra) { const s = S[u], n = cur && cur.NB[u]; let h = '<b>' + esc(s[0]) + '</b><br>USID: ' + esc(u); if (cur && u === cur.src) h += '<br><span style="color:#f97316">SOURCE</span>'; else if (n) { h += '<br>' + STAT[n.st][0]; if (n.pct != null) h += ' · HO ' + n.pct.toFixed(1) + '%'; if (n.d != null) h += ' · ' + n.d + ' mi'; } return h + (extra || ''); }
-const popup = (u, extra) => tip(u, extra) + '<br><a href="#" onclick="loadSource(' + String(u).replace(/'/g, '') + ');return false" style="color:#60a5fa">Load as source</a>';
+const popup = (u, extra) => tip(u, extra) + '<br><a href="#" onclick="loadSource(\'' + String(u).replace(/'/g, '') + '\',\'map\');return false" style="color:#60a5fa">Load as source</a>';
 
-function loadSource(u) {
+function loadSource(u, via) {
   u = String(u).trim().toUpperCase(); if (!S[u]) { toast('USID not found'); return; }
+  if (via) logEvent('search', u, via);
   const A = analyse(u); A.NB = {}; A.nbrs.forEach(n => A.NB[n.u] = n);
   A.role = {}; A.nbrs.forEach(n => { if (S[n.u]) A.role[n.u] = n.st === 'ok' ? 'ok' : 'missing'; }); A.role[u] = 'source';
   cur = A; LAT0 = S[u][1]; LON0 = S[u][2];
@@ -434,17 +534,18 @@ function loadSource(u) {
   const src = S[u]; const draw = ALL.filter(k => A.dist[k] <= CFG.maxMiles || A.role[k]); A.draw = draw; dots = []; siteLayers = {};
   ['other', 'missing', 'ok', 'source'].forEach(role => {
     draw.filter(k => (A.role[k] || 'other') === role).forEach(k => {
-      const s = S[k], g = G[role], sl = siteLayers[k] = {wedges:[]}, onClick = e => siteClick(k, e);
+      const s = S[k], g = G[role], sl = siteLayers[k] = {wedges:[], dot:null}, onClick = e => siteClick(k, e);
       s[3].forEach(c => {
         const p = L.polygon(wedge(s[1], s[2], c[1], radius), {color:'#000', weight:1, fillColor:COL[role], fillOpacity:.7});
         p.bindTooltip(tip(k, '<br>Cell: ' + esc(c[0]) + ' (' + c[1] + '°)'), {sticky:true});
         p.bindPopup(popup(k, '<br>Cell: ' + esc(c[0]) + ' (' + c[1] + '°)'));
         p.on('click', onClick); sl.wedges.push(p); g.addLayer(p); wedges.push({p, s, az:c[1], role});
       });
+      if (!s[3].length) { const dot = L.circleMarker([s[1], s[2]], {radius:5, color:'#000', weight:1, fillColor:COL[role], fillOpacity:.9}).bindTooltip(tip(k)).bindPopup(popup(k)); dot.on('click', onClick); sl.dot = dot; g.addLayer(dot); dots.push({m:dot, role}); }
       g.addLayer(L.marker([s[1], s[2]], {interactive:false, icon:L.divIcon({className:'', iconSize:[150, 20], iconAnchor:[-8, 10], html:'<div class="lbl lbl-' + role + '" style="color:' + TXT[role] + '">' + esc(s[0]) + '</div>'})}));
     });
   });
-  A.nbrs.forEach(n => { if (!S[n.u]) return; const miss = n.st !== 'ok', s = S[n.u]; L.polyline([[src[1], src[2]], [s[1], s[2]]], miss ? {color:'#f59e0b', weight:1.8, dashArray:'6,5', opacity:.85} : {color:'#10b981', weight:1.8, opacity:.75}).addTo(miss ? LG.missing : LG.ok); });
+  A.nbrs.forEach(n => { if (!S[n.u]) return; const miss = n.st !== 'ok', s = S[n.u]; L.polyline([[src[1], src[2]], [s[1], s[2]]], miss ? {color:'#f59e0b', weight:1.8, dashArray:'6,5', opacity:.85, interactive:false} : {color:'#10b981', weight:1.8, opacity:.75, interactive:false}).addTo(miss ? LG.missing : LG.ok); });
   applyVis(); recolor(); selected.forEach(styleSel);
   incl = {}; incl[u] = true; A.nbrs.forEach(n => { if (S[n.u]) incl[n.u] = (n.st === 'ok'); });
   $('empty').style.display = 'none'; $('panel').style.display = ''; $('q').value = u;
@@ -501,7 +602,7 @@ $('btnCsvAll').addEventListener('click', () => { toast('Analysing all sources ..
 let acIdx = -1;
 function acHits(v) { v = v.trim().toUpperCase(); if (v.length < 2) return []; const starts = [], inc = []; for (const k of ALL) { const nm = String(S[k][0]).toUpperCase(); if (k === v || k.startsWith(v) || nm.startsWith(v)) starts.push(k); else if (k.includes(v) || nm.includes(v)) inc.push(k); if (starts.length >= 40) break; } return starts.concat(inc).slice(0, 40); }
 function renderAc() { const hits = acHits($('q').value), dd = $('ac'); acIdx = -1; if (!hits.length) { dd.style.display = 'none'; dd.innerHTML = ''; return; } dd.innerHTML = hits.map(k => '<div class="ai" data-u="' + esc(k) + '"><b>' + esc(k) + '</b><span>' + esc(S[k][0]) + '</span>' + (D.nbr[k] ? '<i style="color:#10b981;font-size:10px">✓ cluster</i>' : '') + '</div>').join(''); dd.style.display = 'block'; }
-function pick(u) { $('ac').style.display = 'none'; loadSource(u); }
+function pick(u) { $('ac').style.display = 'none'; loadSource(u, 'search'); }
 $('q').addEventListener('input', renderAc);
 $('q').addEventListener('keydown', e => { const items = $('ac').querySelectorAll('.ai'); if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (!items.length) return; e.preventDefault(); acIdx = Math.max(0, Math.min(items.length - 1, acIdx + (e.key === 'ArrowDown' ? 1 : -1))); items.forEach((el, i) => el.classList.toggle('sel', i === acIdx)); } else if (e.key === 'Enter') { e.preventDefault(); const v = $('q').value.trim().toUpperCase(); if (acIdx >= 0 && items[acIdx]) pick(items[acIdx].dataset.u); else if (S[v]) pick(v); else if (items.length) pick(items[0].dataset.u); } else if (e.key === 'Escape') $('ac').style.display = 'none'; });
 $('ac').addEventListener('mousedown', e => { const it = e.target.closest('.ai'); if (it) { e.preventDefault(); pick(it.dataset.u); } });
@@ -509,12 +610,62 @@ document.addEventListener('click', e => { if (!e.target.closest('.srch') && !e.t
 
 const selected = new Set(); let selMode = false, rulerOn = false, rPts = [], fmtKind = 'excel';
 const rLayer = L.layerGroup().addTo(map); const rLine = L.polyline([], {color:'#f87171', weight:3, dashArray:'8,5', interactive:false});
-function setMode(m) { selMode = m === 'sel'; rulerOn = m === 'ruler'; $('btnSel').classList.toggle('on', selMode); $('btnRul').classList.toggle('on', rulerOn); mapEl.classList.toggle('crosshair', selMode || rulerOn); $('rbox').style.display = (rulerOn || rPts.length) ? 'block' : 'none'; updateSelBar(); if (selMode) toast('Select mode: click sites on the map to select / unselect'); if (rulerOn) toast('Ruler: click points on the map'); }
+function setMode(m) {
+  selMode = m === 'sel'; rulerOn = m === 'ruler';
+  $('btnSel').classList.toggle('on', selMode); $('btnRul').classList.toggle('on', rulerOn);
+  mapEl.classList.toggle('crosshair', selMode || rulerOn);
+  selMode ? map.doubleClickZoom.disable() : map.doubleClickZoom.enable();
+  if (!selMode) { sPts = []; drawSel(); }
+  $('rbox').style.display = (rulerOn || rPts.length) ? 'block' : 'none'; updateSelBar();
+  if (selMode) toast('Select: click empty map to draw a polygon (double-click / Enter to close) - or click one site to toggle it');
+  if (rulerOn) toast('Ruler: click points on the map');
+}
 $('btnSel').addEventListener('click', () => setMode(selMode ? null : 'sel')); $('btnRul').addEventListener('click', () => setMode(rulerOn ? null : 'ruler'));
-function siteClick(k, e) { if (selMode) { L.DomEvent.stopPropagation(e); map.closePopup(); toggleSel(k); } else if (rulerOn) { L.DomEvent.stopPropagation(e); map.closePopup(); addRulerPoint([S[k][1], S[k][2]]); } }
-function styleSel(k) { const sl = siteLayers[k]; if (!sl) return; const on = selected.has(k); sl.wedges.forEach(p => p.setStyle(on ? {color:'#f59e0b', weight:3} : {color:'#000', weight:1})); }
+
+// polygon (lasso) selection
+let sPts = [];
+const sLayer = L.layerGroup().addTo(map);
+const sShape = L.polygon([], {color:'#f59e0b', weight:2, dashArray:'6,4', fillColor:'#f59e0b', fillOpacity:.12, interactive:false});
+function drawSel() {
+  sLayer.clearLayers();
+  if (sPts.length) {
+    sShape.setLatLngs(sPts); sLayer.addLayer(sShape);
+    sPts.forEach((p, i) => sLayer.addLayer(L.circleMarker(p, {radius:i === 0 ? 6 : 4, color:'#f59e0b', fillColor:'#fff', fillOpacity:1, weight:2, interactive:false})));
+  }
+  $('drawCtl').style.display = sPts.length ? 'inline-flex' : 'none'; updateSelBar();
+}
+function addSelPt(ll) {
+  const p = Array.isArray(ll) ? ll : [ll.lat, ll.lng], cp = x => map.latLngToContainerPoint(x);
+  if (sPts.length >= 3 && cp(p).distanceTo(cp(sPts[0])) < 9) { finishSel(); return; }             // click first point = close
+  if (sPts.length && cp(p).distanceTo(cp(sPts[sPts.length - 1])) < 5) return;                      // ignore the 2nd click of a double-click
+  sPts.push(p); drawSel();
+}
+function finishSel() {
+  if (sPts.length < 3) { toast('Need at least 3 points for a polygon'); return; }
+  if (!cur) { toast('Load a source first'); return; }
+  const P = sPts.map(p => toXY(p[0], p[1])); let n = 0;
+  cur.draw.forEach(k => {
+    const r = cur.role[k] || 'other';
+    if ((r === 'other' && !$('vOther').checked) || (r === 'missing' && !$('vMiss').checked)) return;
+    if (pip(toXY(S[k][1], S[k][2]), P) && !selected.has(k)) { selected.add(k); styleSel(k); n++; }
+  });
+  sPts = []; drawSel(); toast(n + ' site(s) added - ' + selected.size + ' selected in total');
+}
+$('selFin').addEventListener('click', finishSel);
+$('selUndo').addEventListener('click', () => { sPts.pop(); drawSel(); });
+$('selCancel').addEventListener('click', () => { sPts = []; drawSel(); });
+
+function siteClick(k, e) {
+  if (selMode) { L.DomEvent.stopPropagation(e); map.closePopup(); if (sPts.length) addSelPt([S[k][1], S[k][2]]); else toggleSel(k); }
+  else if (rulerOn) { L.DomEvent.stopPropagation(e); map.closePopup(); addRulerPoint([S[k][1], S[k][2]]); }
+}
+function styleSel(k) {
+  const sl = siteLayers[k]; if (!sl) return; const on = selected.has(k);
+  sl.wedges.forEach(p => p.setStyle(on ? {color:'#f59e0b', weight:3} : {color:'#000', weight:1}));
+  if (sl.dot) { sl.dot.setStyle(on ? {color:'#f59e0b', weight:3} : {color:'#000', weight:1}); sl.dot.setRadius(on ? 8 : 5); }
+}
 function toggleSel(k) { selected.has(k) ? selected.delete(k) : selected.add(k); styleSel(k); updateSelBar(); }
-function updateSelBar() { $('selN').textContent = selected.size + ' selected'; $('selbar').style.display = (selMode || selected.size) ? 'flex' : 'none'; }
+function updateSelBar() { $('selN').textContent = selected.size + ' selected' + (sPts.length ? ' | drawing ' + sPts.length + ' pts' : ''); $('selbar').style.display = (selMode || selected.size) ? 'flex' : 'none'; }
 function selectVisible() { if (!cur) return; const b = map.getBounds(); let n = 0; cur.draw.forEach(k => { const r = cur.role[k] || 'other'; if ((r === 'other' && !$('vOther').checked) || (r === 'missing' && !$('vMiss').checked)) return; if (b.contains([S[k][1], S[k][2]])) { selected.add(k); styleSel(k); n++; } }); updateSelBar(); toast(n + ' visible site(s) selected'); }
 function clearSel() { const old = Array.from(selected); selected.clear(); old.forEach(styleSel); updateSelBar(); }
 $('selVis').addEventListener('click', selectVisible); $('selClr').addEventListener('click', clearSel);
@@ -534,9 +685,14 @@ $('mCopy').addEventListener('click', () => copyText(selText(fmtKind))); $('mDl')
 const dtxt = mi => (mi*1.609344).toFixed(2) + ' km / ' + mi.toFixed(2) + ' mi';
 function drawRuler() { rLayer.clearLayers(); rLine.setLatLngs(rPts); rLayer.addLayer(rLine); let cum = 0, last = 0; rPts.forEach((p, i) => { if (i > 0) { last = hav(rPts[i-1][0], rPts[i-1][1], p[0], p[1]); cum += last; } const m = L.circleMarker(p, {radius:4, color:'#f87171', fillColor:'#fff', fillOpacity:1, weight:2, interactive:false}); if (i > 0) m.bindTooltip(dtxt(cum), {permanent:true, direction:'top', offset:[0, -6], className:'rtip'}); rLayer.addLayer(m); }); $('rTot').textContent = 'Total: ' + dtxt(cum); $('rSeg').textContent = rPts.length > 1 ? 'Last segment: ' + dtxt(last) + ' | ' + rPts.length + ' points' : (rPts.length ? '1 point - click next point' : ''); $('rbox').style.display = (rulerOn || rPts.length) ? 'block' : 'none'; }
 function addRulerPoint(ll) { rPts.push(ll); drawRuler(); }
-map.on('click', e => { if (rulerOn) addRulerPoint([e.latlng.lat, e.latlng.lng]); });
+map.on('click', e => { if (rulerOn) addRulerPoint([e.latlng.lat, e.latlng.lng]); else if (selMode) addSelPt(e.latlng); });
+map.on('dblclick', () => { if (selMode && sPts.length >= 3) finishSel(); });
 $('rUndo').addEventListener('click', () => { rPts.pop(); drawRuler(); }); $('rClr').addEventListener('click', () => { rPts = []; drawRuler(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !(e.target.tagName === 'INPUT')) { setMode(null); $('mdl').style.display = 'none'; } });
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'Enter' && selMode && sPts.length >= 3) finishSel();
+  else if (e.key === 'Escape') { if (sPts.length) { sPts = []; drawSel(); } else { setMode(null); $('mdl').style.display = 'none'; } }
+});
 
 (function init() {
   const hash = decodeURIComponent(location.hash.slice(1)).toUpperCase();
@@ -545,39 +701,175 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !(e.target
   else if (ALL.length) { const b = L.latLngBounds(ALL.map(k => [S[k][1], S[k][2]])); map.fitBounds(b); }
 })();
 
-// ── KEY FIX: Dynamically resize the parent Streamlit iframe to fill viewport ──
-(function resizeIframe() {
-  if (window.parent !== window) {
+document.getElementById('loading').style.display = 'none';
+
+// fit this iframe to the free space between the upload bar and the footer
+(function fitFrame() {
+  const FOOT = 28;
+  function fit() {
     try {
-      const iframes = window.parent.document.querySelectorAll('iframe[srcdoc], iframe[data-testid="stHtml"]');
-      for (const iframe of iframes) {
-        if (iframe.contentWindow === window) {
-          iframe.style.height = window.innerHeight + 'px';
-          iframe.style.width = '100%';
-          break;
-        }
-      }
-    } catch(e) {}
+      const fe = window.frameElement; if (!fe) return;
+      const h = window.parent.innerHeight - fe.getBoundingClientRect().top - FOOT;
+      if (h > 300) { fe.style.height = h + 'px'; fe.style.width = '100%'; fe.style.display = 'block'; }
+      map.invalidateSize();
+    } catch (e) {}
   }
-  window.addEventListener('resize', resizeIframe);
+  fit(); setInterval(fit, 700);
+  try { window.parent.addEventListener('resize', fit); } catch (e) {}
 })();
 </script></body></html>"""
 
-        final_html = HTML.replace("__DATA__", data)
-        components.html(final_html, height=900, scrolling=False)
+# ═══════════════════════════════ UI ═══════════════════════════════
+PAGE_CSS = """
+<style>
+  #MainMenu, footer, header[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"] { display:none !important; }
+  html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], section.main { background:#0a0e1a !important; overflow:hidden !important; }
+  .block-container { padding:0 !important; max-width:100% !important; }
+  div[data-testid="stVerticalBlock"] { gap:0 !important; }
+  .element-container { margin-bottom:0 !important; }
+  /* header (top) */
+  .app-hdr { background:linear-gradient(90deg,#0b1d46 0%,#12306b 100%); color:#fff; font-size:18pt; font-weight:600; letter-spacing:.3px;
+             padding:8px 22px; height:52px; box-sizing:border-box; display:flex; align-items:center; border-bottom:2px solid #3b82f6; white-space:nowrap; }
+  /* upload bar */
+  .st-key-upl { background:#0d1220; border-bottom:1px solid #1e293b; padding:4px 14px 6px 14px; }
+  label[data-testid="stWidgetLabel"] p { font-size:10px !important; color:#94a3b8 !important; margin:0 !important; font-weight:600; text-transform:uppercase; letter-spacing:.6px; }
+  .stFileUploader { margin:0 !important; }
+  [data-testid="stFileUploaderDropzone"] { min-height:34px !important; padding:3px 8px !important; background:rgba(255,255,255,.05) !important; border:1px solid rgba(255,255,255,.12) !important; border-radius:4px !important; }
+  [data-testid="stFileUploaderDropzoneInstructions"] { display:none !important; }
+  [data-testid="stFileUploaderDropzone"] small, [data-testid="stFileUploaderDropzone"] span { color:#94a3b8 !important; font-size:11px !important; }
+  [data-testid="stFileUploaderFile"] { padding:2px 4px !important; }
+  [data-testid="stTextInput"] input { background:#1e293b !important; color:#e2e8f0 !important; border:1px solid #334155 !important; font-size:12px !important; min-height:34px !important; }
+  div.stButton > button { height:34px; min-height:34px; font-weight:600; border-radius:4px; }
+  div.stButton > button[kind="primary"] { background:#2563eb; border:1px solid #3b82f6; color:#fff; }
+  div.stButton > button:disabled { background:#1e293b !important; color:#64748b !important; border:1px solid #334155 !important; }
+  .idchip { background:#1e293b; border:1px solid #334155; border-radius:4px; height:34px; box-sizing:border-box; padding:0 8px; color:#e2e8f0; font-size:12px; line-height:34px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .idchip span { color:#64748b; font-size:9px; text-transform:uppercase; letter-spacing:.6px; margin-right:6px; }
+  .stat-line { font-size:11px; line-height:34px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* map frame fills the space between upload bar and footer */
+  .stApp iframe { height:calc(100vh - 190px); width:100%; border:0; display:block; }
+  .landing { height:calc(100vh - 190px); display:flex; align-items:center; justify-content:center; color:#64748b; text-align:center; }
+  /* footer (always on the bottom line) */
+  .app-ftr { position:fixed; left:0; right:0; bottom:0; height:26px; background:#0d1220; border-top:1px solid #1e293b; color:#cbd5e1; font-size:11px;
+             display:flex; align-items:center; justify-content:flex-end; padding:0 22px; z-index:99999; }
+  .app-ftr a { color:#60a5fa; text-decoration:none; margin-left:4px; }
+  /* loading message in the middle of the page */
+  .ov { position:fixed; inset:0; background:rgba(10,14,26,.86); z-index:100000; display:flex; align-items:center; justify-content:center; }
+  .ov-box { text-align:center; color:#e2e8f0; }
+  .ov-t { font-size:18px; font-weight:600; margin-top:16px; } .ov-s { font-size:12px; color:#94a3b8; margin-top:6px; }
+  .spin { width:54px; height:54px; border:6px solid #1e293b; border-top-color:#3b82f6; border-radius:50%; margin:0 auto; animation:sp .9s linear infinite; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+</style>
+"""
 
-    except Exception as e:
-        st.error(f"Error processing files: {e}")
-else:
-    st.markdown("""
-    <div style="display:flex;align-items:center;justify-content:center;height:calc(100vh - 100px);background:#0a0e1a;color:#64748b;text-align:center;padding:40px">
-        <div>
-            <div style="font-size:48px;margin-bottom:16px">📁</div>
-            <h3 style="color:#94a3b8;margin-bottom:8px;font-size:18px">Upload both files to generate the interactive map</h3>
-            <p style="font-size:12px;line-height:1.6">
-                1. <b>Site Data</b> (CSV) — USID, coordinates, azimuth, cell info<br>
-                2. <b>SQL Table</b> (Excel/CSV) — Neighbor relationships and HO data
-            </p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+
+def overlay(msg, sub=""):
+    return f'<div class="ov"><div class="ov-box"><div class="spin"></div><div class="ov-t">{msg}</div><div class="ov-s">{sub}</div></div></div>'
+
+
+def cols(spec):
+    try:
+        return st.columns(spec, gap="small", vertical_alignment="bottom")
+    except TypeError:                      # older Streamlit
+        return st.columns(spec, gap="small")
+
+
+def show_map(html):
+    """st.iframe (new Streamlit) with a fallback to components.html (older Streamlit)."""
+    if hasattr(st, "iframe"):
+        st.iframe(html, height=700)
+    else:
+        components.html(html, height=700, scrolling=False)
+
+
+def sig(f):
+    return (f.name, f.size) if f is not None else None
+
+
+def main():
+    st.set_page_config(layout="wide", page_title=APP_TITLE, page_icon="📡", initial_sidebar_state="collapsed")
+    st.markdown(PAGE_CSS, unsafe_allow_html=True)
+    st.markdown(f'<div class="app-hdr">{APP_TITLE}</div>', unsafe_allow_html=True)
+
+    log_url, log_token = secret("LOG_WEBHOOK_URL"), secret("LOG_TOKEN")
+    for k in ("u_name", "u_id"):
+        st.session_state.setdefault(k, "")
+    if "ident" not in st.session_state:
+        st.session_state["ident"] = detect_identity()
+    ident = st.session_state["ident"]
+
+    try:
+        bar = st.container(key="upl")
+    except TypeError:
+        bar = st.container()
+    with bar:
+        c1, c2, c3, c4, c5, c6 = cols([3.0, 3.0, 1.5, 1.5, 0.8, 2.4])
+        with c1:
+            site_file = st.file_uploader("Site data (CSV)", type=["csv"], key="site")
+        with c2:
+            nbr_file = st.file_uploader("SQL table (XLSX / CSV)", type=["xlsx", "xls", "csv"], key="nbr")
+        if ident:                                               # detected automatically - nothing to type
+            with c3:
+                st.markdown(f'<div class="idchip"><span>User</span>{ident["id"]}</div>', unsafe_allow_html=True)
+            with c4:
+                st.markdown(f'<div class="idchip"><span>Computer</span>{ident["host"] or ident["src"]}</div>', unsafe_allow_html=True)
+            name, uid = ident["name"], ident["id"]
+            user = dict(ident)
+        else:                                                   # cannot be detected from a browser -> ask
+            with c3:
+                st.text_input("Name", key="u_name", placeholder="Your name")
+            with c4:
+                st.text_input("User ID", key="u_id", placeholder="e.g. e12345")
+            name, uid = st.session_state.u_name.strip(), st.session_state.u_id.strip()
+            user = {"id": uid, "name": name, "host": "", "ip": client_ip(), "email": auth_email(), "src": "typed"}
+        ready = bool(site_file and nbr_file and name and uid)
+        with c5:
+            go = st.button("▶ Go", type="primary", disabled=not ready, use_container_width=True, key="go")
+        status = c6.empty()
+
+    cur_sig = (sig(site_file), sig(nbr_file))
+
+    if go and ready:
+        ph = st.empty()
+        try:
+            ph.markdown(overlay("Loading data ...", "Reading site file"), unsafe_allow_html=True)
+            site_df = read_upload(site_file)
+            ph.markdown(overlay("Loading data ...", "Reading SQL table"), unsafe_allow_html=True)
+            nbr_df = read_upload(nbr_file)
+            ph.markdown(overlay("Loading data ...", "Building the map - this can take a few seconds"), unsafe_allow_html=True)
+            payload = build_payload(site_df, nbr_df, user, log_url, log_token)
+            st.session_state["map_html"] = render_html(payload)
+            st.session_state["loaded_sig"] = cur_sig
+            st.session_state["loaded_info"] = f"{len(payload['sites']):,} sites | {len(payload['nbr']):,} clusters"
+            post_log(log_url, log_token, "go", user, f"{site_file.name} | {nbr_file.name}")
+        except Exception as e:
+            st.session_state.pop("map_html", None)
+            ph.empty()
+            st.error(f"Could not load the files: {e}")
+        ph.empty()
+
+    loaded = st.session_state.get("loaded_sig") is not None and "map_html" in st.session_state
+    if loaded and st.session_state["loaded_sig"] == cur_sig:
+        msg, color = f"✓ Loaded - {st.session_state['loaded_info']}", "#10b981"
+    elif loaded:
+        msg, color = "New files selected - click Go to reload", "#f59e0b"
+    elif not (site_file and nbr_file):
+        msg, color = "Upload both files", "#64748b"
+    elif not (name and uid):
+        msg, color = "Enter Name and User ID", "#f59e0b"
+    else:
+        msg, color = "Ready - click Go", "#60a5fa"
+    status.markdown(f'<div class="stat-line" style="color:{color}">{msg}</div>', unsafe_allow_html=True)
+
+    if "map_html" in st.session_state:
+        show_map(st.session_state["map_html"])
+    else:
+        st.markdown(
+            '<div class="landing"><div><div style="font-size:46px;margin-bottom:14px">📡</div>'
+            '<div style="font-size:18px;color:#94a3b8;margin-bottom:8px">Upload both files, then press <b style="color:#60a5fa">Go</b></div>'
+            '<div style="font-size:12px;line-height:1.7">1. <b>Site data</b> (CSV): USID, coordinates, azimuth, cell<br>2. <b>SQL table</b> (Excel / CSV): neighbour relations and HO data</div></div></div>',
+            unsafe_allow_html=True)
+
+    st.markdown(f'<div class="app-ftr">{SUPPORT_NAME} for any support, please connect with <a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a></div>', unsafe_allow_html=True)
+
+
+main()
