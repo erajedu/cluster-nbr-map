@@ -633,7 +633,7 @@ padding:8px 22px; height:48px; box-sizing:border-box; display:flex; align-items:
 
 /* Slim input bar - single row, low height */
 .input-bar { background:#0d1220; border-bottom:1px solid #1e293b; padding:4px 14px; display:flex; align-items:center; gap:8px; }
-.input-bar label[data-testid="stWidgetLabel"] p { font-size:9px !important; color:#94a3b8 !important; margin:0 !important; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+.input-bar label[data-testid="stWidgetLabel"] p { font-size:9px !important; color:#ffffff !important; margin:0 !important; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
 
 /* File uploaders - compact */
 .stFileUploader { margin:0 !important; }
