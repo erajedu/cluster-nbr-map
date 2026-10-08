@@ -1,9 +1,5 @@
 """
 Cluster Neighbor Visualization Tool  -  Streamlit app
-Layout (top -> bottom):  header  |  upload bar (Site CSV, SQL table, SIGNUM ID, [Go])  |  sidebar + map  |  footer
-Flow: upload both files, enter SIGNUM ID, press  Go  -> loading message -> map.
-Usage logging (who searched which USID, when): set LOG_WEBHOOK_URL (+ LOG_TOKEN) in .streamlit/secrets.toml
-(see usage_log_apps_script.gs for a free Google-Sheet receiver). Leave empty to disable.
 """
 import getpass
 import io
@@ -17,17 +13,15 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-# ──────────────────────── CONFIG ─────────────────────────
+# CONFIG
 APP_TITLE = "Cluster Neighbor Visualization Tool"
 SUPPORT_NAME = "@ Rajesh Dubey"
 SUPPORT_EMAIL = "rajesh.dubey@ericsson.com"
 MAX_DISTANCE_MILES, BUFFER_MILES, CLOSEST_N, ZERO_HO_IS_MISSING, WEDGE_RADIUS_M = 25.0, 1.8, 15, False, 400
 USID_COL, SITE_NAME_COL, LAT_COL, LON_COL, AZIMUTH_COL, CELL_COL = "USID", "ENODEB_New", "LATITUDE", "LONGITUDE", "AZIMUTH", "CELL"
 NBR_SRC_COL, NBR_COL, CLUSTER_NAME_COL, HO_COL, PCT_COL = "USID", "ClusterUSID", "ClusterName", "HO ATT", "% Sharing"
-# ──────────────────────────────────────────────────────────
 
 def secret(name):
-    """Read from .streamlit/secrets.toml (Streamlit Cloud 'Secrets') or an environment variable."""
     try:
         v = st.secrets.get(name)
         if v:
@@ -37,7 +31,6 @@ def secret(name):
     return os.environ.get(name, "")
 
 def auth_email():
-    """Viewer e-mail when the app is private / login-protected on Streamlit Cloud (empty for public apps)."""
     for attr in ("user", "experimental_user"):
         try:
             u = getattr(st, attr, None)
@@ -49,7 +42,6 @@ def auth_email():
     return ""
 
 def client_ip():
-    """IP address of the browser that is talking to this app ('' if unknown)."""
     try:
         ip = getattr(st.context, "ip_address", None)
         if ip:
@@ -82,13 +74,6 @@ def windows_display_name():
         return ""
 
 def detect_identity():
-    """
-    Who is using the tool?  A browser cannot read the visitor's PC name / Windows login, so:
-    1. app runs on the user's own PC (browser IP is loopback, or RUN_LOCAL=1)  -> OS login + computer name   [src 'local-os']
-    2. app hosted inside the company network (browser IP is private)            -> reverse-DNS host name of the PC + login e-mail if any
-    3. app is private / login-protected on Streamlit Cloud                      -> login e-mail                [src 'login']
-    4. otherwise None -> the page asks the user to type SIGNUM ID              [src 'typed']
-    """
     ip, email = client_ip(), auth_email()
     if secret("RUN_LOCAL") == "1" or _ip_is(ip, "is_loopback"):
         uid = getpass.getuser()
@@ -189,7 +174,6 @@ def render_html(payload):
     return HTML.replace("DATA", data)
 
 def post_log(url, token, event, user, extra=""):
-    """Server-side log line (used for the 'go' event). Never breaks the app."""
     if not url:
         return
     try:
@@ -203,7 +187,6 @@ def post_log(url, token, event, user, extra=""):
     except Exception:
         pass
 
-# ───────────────────────── HTML / JS (map + side panel) ────────────────────────
 HTML = r"""<!DOCTYPE html>
 <html lang="en"> <head> <meta charset="utf-8"> <title>Cluster NBR Map</title>
  <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -213,15 +196,11 @@ HTML = r"""<!DOCTYPE html>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;color:#e2e8f0;background:#0a0e1a;overflow:hidden}
 #app{display:flex;flex-direction:column;height:100%}
-#hdr{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#fff;font-size:20px;font-weight:600;padding:10px 20px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
-#hdr .sub{font-size:11px;opacity:0.85;font-weight:400}
 #wrap{display:flex;flex:1;min-height:0;overflow:hidden}
 #side{width:clamp(220px,14vw,290px);min-width:220px;overflow-y:auto;background:#0d1220;border-right:1px solid #1e293b;padding:10px;flex-shrink:0}
-#side::-webkit-scrollbar{width:5px}#side::-webkit-scrollbar-track{background:#0a0e1a}#side::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
 #mapbox{flex:1;position:relative;background:#020617;min-width:0}
 #map{height:100%;width:100%;--fs:13px}
 .section-title{font-size:10px;font-weight:700;color:#60a5fa;text-transform:uppercase;letter-spacing:1px;margin:14px 0 8px;padding-bottom:4px;border-bottom:1px solid #1e293b}
-.section-title:first-child{margin-top:0}
 .search-label{font-size:10px;font-weight:700;color:#60a5fa;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
 #q{width:100%;box-sizing:border-box;padding:7px 10px;font-size:12px;background:#1e293b;border:1px solid #334155;border-radius:4px;color:#e2e8f0;outline:none;margin-bottom:8px}
 #q:focus{border-color:#60a5fa}
@@ -346,12 +325,12 @@ input[type="color"]{width:32px;height:24px;border:1px solid #334155;border-radiu
  <div id="map"></div>
  <div id="mbtn">
  <button class="mb" id="tg" title="Show / hide panel">☰</button>
- <button class="mb" id="btnSel" title="Select sites: click a site, or draw a polygon around many sites">Select</button>
- <button class="mb" id="btnRul" title="Measure distance (km / mi)">📏 Ruler</button>
+ <button class="mb" id="btnSel" title="Select sites">Select</button>
+ <button class="mb" id="btnRul" title="Measure distance">Ruler</button>
  </div>
  <div id="rbox">
  <b style="color:#60a5fa;font-size:11px">Distance ruler</b>
- <div class="hint">Click points on the map (click a site to snap to it)</div>
+ <div class="hint">Click points on the map</div>
  <div id="rTot" style="margin:6px 0 2px;font-size:12px;font-weight:bold;color:#f87171">Total: 0.00 km / 0.00 mi</div>
  <div id="rSeg" class="hint"></div>
  <div class="btn-row" style="margin-top:6px"><button class="btn" id="rUndo">Undo last point</button><button class="btn" id="rClr">Clear</button></div>
@@ -414,10 +393,10 @@ return {src:u, cluster:entry ? entry[0] : '', defined:Object.keys(defd).length, 
 }
 const map = L.map('map').setView([39.5, -98.35], 4);
 const base = {
-'Topo': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'Esri, USGS, NOAA, OpenStreetMap contributors'}),
-'Street': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'© OpenStreetMap contributors'}),
+'Topo': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'Esri'}),
+'Street': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19, attribution:'© OpenStreetMap'}),
 'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:19, attribution:'Esri'}),
-'Light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {maxZoom:19, attribution:'© OpenStreetMap © CARTO'})
+'Light': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {maxZoom:19, attribution:'© CARTO'})
 };
 base.Topo.addTo(map); L.control.layers(base, null, {position:'topright'}).addTo(map);
 map.createPane('poly'); map.getPane('poly').style.zIndex = 450;
@@ -641,53 +620,47 @@ try { window.parent.addEventListener('resize', fit); } catch (e) {}
 })();
 </script></body></html>"""
 
-# ═══════════════════════════════ UI ═══════════════════════════════
 PAGE_CSS = """
 <style>
-/* Hide default Streamlit elements */
 #MainMenu, footer, header[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"] { display:none !important; }
 html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], section.main { background:#0a0e1a !important; overflow:hidden !important; }
 .block-container { padding:0 !important; max-width:100% !important; }
 div[data-testid="stVerticalBlock"] { gap:0 !important; }
 .element-container { margin-bottom:0 !important; }
 
-/* Header */
 .app-hdr { background:linear-gradient(90deg,#0b1d46 0%,#12306b 100%); color:#fff; font-size:18pt; font-weight:600; letter-spacing:.3px;
 padding:8px 22px; height:52px; box-sizing:border-box; display:flex; align-items:center; border-bottom:2px solid #3b82f6; white-space:nowrap; }
 
-/* Compact input panel - matches screenshot style */
-.input-panel { background:#1a1a1a; border-bottom:1px solid #333; padding:6px 12px; }
-.input-row { display:flex; align-items:center; gap:8px; margin:3px 0; flex-wrap:wrap; }
-.input-label { font-size:10px; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:.5px; min-width:80px; }
-.input-field { background:#2a2a2a; border:1px solid #444; color:#fff; font-size:11px; padding:3px 6px; border-radius:3px; height:24px; }
-.input-field:focus { border-color:#3b82f6; outline:none; }
-.input-select { background:#2a2a2a; border:1px solid #444; color:#fff; font-size:11px; padding:3px 6px; border-radius:3px; height:24px; }
+/* Compact input panel - two rows like screenshot */
+.input-panel { background:#1a1a1a; border-bottom:1px solid #333; padding:4px 10px; }
+.input-row { display:flex; align-items:center; gap:6px; margin:2px 0; flex-wrap:wrap; }
+.input-label { font-size:9px; color:#94a3b8; font-weight:600; text-transform:uppercase; letter-spacing:.5px; min-width:70px; }
 
-/* File uploaders - compact */
+/* File uploaders - very compact */
 .stFileUploader { margin:0 !important; }
-[data-testid="stFileUploaderDropzone"] { min-height:24px !important; padding:2px 6px !important; background:#2a2a2a !important; border:1px solid #444 !important; border-radius:3px !important; }
+[data-testid="stFileUploaderDropzone"] { min-height:20px !important; padding:1px 4px !important; background:#2a2a2a !important; border:1px solid #444 !important; border-radius:2px !important; }
 [data-testid="stFileUploaderDropzoneInstructions"] { display:none !important; }
-[data-testid="stFileUploaderDropzone"] small, [data-testid="stFileUploaderDropzone"] span { color:#94a3b8 !important; font-size:10px !important; }
-[data-testid="stFileUploaderFile"] { padding:1px 4px !important; font-size:10px !important; }
-[data-testid="stFileUploaderFile"] button { padding:2px 4px !important; min-height:16px !important; height:16px !important; }
+[data-testid="stFileUploaderDropzone"] small, [data-testid="stFileUploaderDropzone"] span { color:#94a3b8 !important; font-size:9px !important; }
+[data-testid="stFileUploaderFile"] { padding:1px 3px !important; font-size:9px !important; }
+[data-testid="stFileUploaderFile"] button { padding:1px 3px !important; min-height:14px !important; height:14px !important; font-size:9px !important; }
 
 /* SIGNUM ID input - clear visible text */
-.signum-input { background:#2a2a2a !important; border:1px solid #444 !important; color:#fff !important; font-size:11px !important; 
-padding:3px 8px !important; border-radius:3px !important; height:24px !important; min-height:24px !important; }
+.signum-input { background:#2a2a2a !important; border:1px solid #444 !important; color:#fff !important; font-size:10px !important; 
+padding:2px 6px !important; border-radius:2px !important; height:20px !important; min-height:20px !important; }
 .signum-input::placeholder { color:#666 !important; font-style:italic; }
 .signum-input:focus { border-color:#3b82f6 !important; outline:none !important; }
 
-/* Go button */
-.go-btn { background:#2563eb !important; border:1px solid #3b82f6 !important; color:#fff !important; font-size:11px !important; 
-font-weight:600 !important; padding:3px 12px !important; height:24px !important; min-height:24px !important; border-radius:3px !important; cursor:pointer !important; }
+/* Go button - 60% reduced height */
+.go-btn { background:#2563eb !important; border:1px solid #3b82f6 !important; color:#fff !important; font-size:10px !important; 
+font-weight:600 !important; padding:2px 10px !important; height:20px !important; min-height:20px !important; border-radius:2px !important; cursor:pointer !important; }
 .go-btn:hover { background:#1d4ed8 !important; }
 .go-btn:disabled { background:#1e293b !important; color:#475569 !important; border:1px solid #334155 !important; cursor:not-allowed !important; }
 
-.stat-line { font-size:11px; line-height:24px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#10b981; }
+.stat-line { font-size:10px; line-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#10b981; }
 
 /* Map frame */
-.stApp iframe { height:calc(100vh - 100px); width:100%; border:0; display:block; }
-.landing { height:calc(100vh - 100px); display:flex; align-items:center; justify-content:center; color:#64748b; text-align:center; }
+.stApp iframe { height:calc(100vh - 90px); width:100%; border:0; display:block; }
+.landing { height:calc(100vh - 90px); display:flex; align-items:center; justify-content:center; color:#64748b; text-align:center; }
 
 /* Footer */
 .app-ftr { position:fixed; left:0; right:0; bottom:0; height:26px; background:#0d1220; border-top:1px solid #1e293b; color:#cbd5e1; font-size:11px;
@@ -732,31 +705,33 @@ def main():
         st.session_state["ident"] = detect_identity()
     ident = st.session_state["ident"]
     
-    # Compact input panel matching screenshot style
+    # Compact input panel - two rows like screenshot
     st.markdown('<div class="input-panel">', unsafe_allow_html=True)
     
-    # Row 1: File uploads and SIGNUM ID
+    # Row 1: File uploads
     st.markdown('<div class="input-row">', unsafe_allow_html=True)
-    c1, c2, c3, c4 = cols([2.5, 2.5, 2.5, 0.8])
-    
+    c1, c2 = cols([3, 3])
     with c1:
         st.markdown('<span class="input-label">Site Data:</span>', unsafe_allow_html=True)
         site_file = st.file_uploader("", type=["csv"], key="site", label_visibility="collapsed")
-    
     with c2:
         st.markdown('<span class="input-label">SQL Table:</span>', unsafe_allow_html=True)
         nbr_file = st.file_uploader("", type=["xlsx", "xls", "csv"], key="nbr", label_visibility="collapsed")
+    st.markdown('</div>', unsafe_allow_html=True)
     
+    # Row 2: SIGNUM ID and Go button
+    st.markdown('<div class="input-row">', unsafe_allow_html=True)
+    c3, c4, c5 = cols([3, 1, 2])
     with c3:
         st.markdown('<span class="input-label">SIGNUM ID:</span>', unsafe_allow_html=True)
         signum_input = st.text_input("", key="u_signum", placeholder="Enter SIGNUM ID", label_visibility="collapsed")
-    
-    ready = bool(site_file and nbr_file and st.session_state.u_signum.strip())
-    
     with c4:
+        ready = bool(site_file and nbr_file and st.session_state.u_signum.strip())
         go = st.button("▶ Go", type="primary", disabled=not ready, use_container_width=True, key="go")
-    
+    with c5:
+        status = st.empty()
     st.markdown('</div>', unsafe_allow_html=True)
+    
     st.markdown('</div>', unsafe_allow_html=True)
 
     cur_sig = (sig(site_file), sig(nbr_file))
@@ -794,7 +769,7 @@ def main():
     else:
         msg, color = "Ready - click Go", "#60a5fa"
         
-    st.markdown(f'<div class="stat-line" style="color:{color};padding:2px 12px;">{msg}</div>', unsafe_allow_html=True)
+    status.markdown(f'<div class="stat-line" style="color:{color};padding:2px 10px;">{msg}</div>', unsafe_allow_html=True)
 
     if "map_html" in st.session_state:
         show_map(st.session_state["map_html"])
