@@ -674,29 +674,136 @@ PAGE_CSS = """
   /* header (top) */
   .app-hdr { background:linear-gradient(90deg,#0b1d46 0%,#12306b 100%); color:#fff; font-size:18pt; font-weight:600; letter-spacing:.3px;
              padding:8px 22px; height:52px; box-sizing:border-box; display:flex; align-items:center; border-bottom:2px solid #3b82f6; white-space:nowrap; }
-  /* compact upload bar - intentionally small to match the map controls */
-  .st-key-upl { background:#0d1220; border-bottom:1px solid #1e293b; padding:1px 6px 2px 6px; }
-  label[data-testid="stWidgetLabel"] { min-height:0 !important; height:10px !important; margin:0 !important; padding:0 !important; }
-  label[data-testid="stWidgetLabel"] p { font-size:7px !important; color:#fff !important; margin:0 !important; font-weight:600; text-transform:uppercase; letter-spacing:.35px; line-height:9px !important; }
-  [data-testid="stFileUploader"], [data-testid="stTextInput"] { margin:0 !important; padding:0 !important; }
-  [data-testid="stFileUploader"] { height:27px !important; overflow:hidden; }
-  [data-testid="stFileUploaderDropzone"], [data-testid="stFileUploaderFile"], [data-testid="stTextInput"] input, [data-testid="stTextInput"] div[data-baseweb="input"] {
-      min-height:25px !important; height:25px !important; box-sizing:border-box; background:#1e293b !important; border:1px solid #334155 !important; border-radius:3px !important; }
-  [data-testid="stFileUploaderDropzone"] { padding:0 5px !important; }
-  [data-testid="stFileUploaderDropzoneInstructions"] { display:none !important; }
-  [data-testid="stFileUploaderDropzone"] small, [data-testid="stFileUploaderDropzone"] span { color:#cbd5e1 !important; font-size:9px !important; line-height:23px !important; }
-  [data-testid="stFileUploader"]:has([data-testid="stFileUploaderFile"]) [data-testid="stFileUploaderDropzone"] { display:none !important; }
-  [data-testid="stFileUploaderFile"] { padding:0 5px !important; margin:0 !important; display:flex; align-items:center; height:25px !important; min-height:25px !important; }
-  [data-testid="stFileUploaderFile"] * { color:#e2e8f0 !important; font-size:9px !important; line-height:23px !important; }
-  [data-testid="stFileUploaderFile"] small { display:none !important; }
-  [data-testid="stTextInput"] input { color:#e2e8f0 !important; font-size:10px !important; padding:0 6px !important; line-height:23px !important; }
-  [data-testid="stTextInput"] input::placeholder { color:#94a3b8 !important; opacity:1 !important; }
-  [data-testid="InputInstructions"] { display:none !important; }
-  div.stButton { margin:0 !important; padding:0 !important; }
-  div.stButton > button { height:25px !important; min-height:25px !important; padding:0 8px !important; font-size:10px !important; font-weight:600; line-height:23px !important; border-radius:3px !important; }
-  div.stButton > button[kind="primary"] { background:#2563eb; border:1px solid #3b82f6; color:#fff; }
-  div.stButton > button:disabled { background:#1e293b !important; color:#64748b !important; border:1px solid #334155 !important; }
-  .stat-line { font-size:9px; line-height:25px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* compact upload/input bar - controls intentionally match the small reference controls */
+  .st-key-upl {
+    background:#0d1220;
+    border-bottom:1px solid #1e293b;
+    padding:2px 8px 3px 8px !important;
+  }
+
+  /* small white labels */
+  label[data-testid="stWidgetLabel"] {
+    min-height:0 !important;
+    margin:0 !important;
+    padding:0 !important;
+  }
+  label[data-testid="stWidgetLabel"] p {
+    font-size:8px !important;
+    color:#ffffff !important;
+    margin:0 !important;
+    padding:0 !important;
+    font-weight:500 !important;
+    text-transform:uppercase;
+    letter-spacing:.3px;
+    line-height:9px !important;
+  }
+
+  [data-testid="stFileUploader"],
+  [data-testid="stTextInput"] {
+    margin:0 !important;
+    padding:0 !important;
+  }
+
+  /* file upload control */
+  [data-testid="stFileUploader"] {
+    height:24px !important;
+    min-height:24px !important;
+    max-height:24px !important;
+    overflow:hidden !important;
+  }
+
+  [data-testid="stFileUploaderDropzone"],
+  [data-testid="stFileUploaderFile"],
+  [data-testid="stTextInput"] input,
+  [data-testid="stTextInput"] div[data-baseweb="input"] {
+    min-height:24px !important;
+    height:24px !important;
+    max-height:24px !important;
+    box-sizing:border-box !important;
+    background:#1e293b !important;
+    border:1px solid #334155 !important;
+    border-radius:3px !important;
+  }
+
+  [data-testid="stFileUploaderDropzone"] {
+    padding:0 6px !important;
+    display:flex !important;
+    align-items:center !important;
+  }
+  [data-testid="stFileUploaderDropzoneInstructions"] {
+    display:none !important;
+  }
+  [data-testid="stFileUploaderDropzone"] small,
+  [data-testid="stFileUploaderDropzone"] span {
+    color:#94a3b8 !important;
+    font-size:9px !important;
+    line-height:22px !important;
+  }
+
+  /* once a file is attached, show only the compact file row */
+  [data-testid="stFileUploader"]:has([data-testid="stFileUploaderFile"]) [data-testid="stFileUploaderDropzone"] {
+    display:none !important;
+  }
+  [data-testid="stFileUploaderFile"] {
+    padding:0 6px !important;
+    margin:0 !important;
+    display:flex !important;
+    align-items:center !important;
+  }
+  [data-testid="stFileUploaderFile"] * {
+    color:#e2e8f0 !important;
+    font-size:9px !important;
+    line-height:22px !important;
+  }
+  [data-testid="stFileUploaderFile"] small {
+    display:none !important;
+  }
+
+  /* SIGNUM input */
+  [data-testid="stTextInput"] input {
+    color:#e2e8f0 !important;
+    font-size:10px !important;
+    line-height:22px !important;
+    padding:0 7px !important;
+  }
+  [data-testid="stTextInput"] input::placeholder {
+    color:#94a3b8 !important;
+    opacity:1 !important;
+  }
+  [data-testid="InputInstructions"] {
+    display:none !important;
+  }
+
+  /* compact Go button */
+  div.stButton > button {
+    height:24px !important;
+    min-height:24px !important;
+    max-height:24px !important;
+    padding:0 10px !important;
+    font-size:10px !important;
+    line-height:22px !important;
+    font-weight:600 !important;
+    border-radius:3px !important;
+  }
+  div.stButton > button[kind="primary"] {
+    background:#2563eb !important;
+    border:1px solid #3b82f6 !important;
+    color:#fff !important;
+  }
+  div.stButton > button:disabled {
+    background:#1e293b !important;
+    color:#64748b !important;
+    border:1px solid #334155 !important;
+  }
+
+  /* compact loaded/status text */
+  .stat-line {
+    font-size:9px !important;
+    line-height:24px !important;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
   /* map frame fills the space between upload bar and footer */
   .stApp iframe { height:calc(100vh - 150px); width:100%; border:0; display:block; }
   .landing { height:calc(100vh - 150px); display:flex; align-items:center; justify-content:center; color:#64748b; text-align:center; }
