@@ -667,335 +667,47 @@ document.getElementById('loading').style.display = 'none';
 PAGE_CSS = """
 <style>
   #MainMenu, footer, header[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"] { display:none !important; }
-
-  html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], section.main {
-      background:#0a0e1a !important;
-      overflow:hidden !important;
-  }
-
-  .block-container {
-      padding:0 !important;
-      max-width:100% !important;
-  }
-
+  html, body, .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], section.main { background:#0a0e1a !important; overflow:hidden !important; }
+  .block-container { padding:0 !important; max-width:100% !important; }
   div[data-testid="stVerticalBlock"] { gap:0 !important; }
   .element-container { margin-bottom:0 !important; }
-
-  /* ================= HEADER - UNCHANGED ================= */
-  .app-hdr {
-      background:linear-gradient(90deg,#0b1d46 0%,#12306b 100%);
-      color:#fff;
-      font-size:18pt;
-      font-weight:600;
-      letter-spacing:.3px;
-      padding:8px 16px;
-      height:50px;
-      box-sizing:border-box;
-      display:flex;
-      align-items:center;
-      border-bottom:2px solid #3b82f6;
-      white-space:nowrap;
-  }
-
-  /* =========================================================
-     COMPACT TOP INPUT BAR
-     Keep the Streamlit widgets, but give them a controlled
-     28px row and a centered, fixed-width control group.
-     ========================================================= */
-
-  .st-key-upl {
-      background:#0d1220 !important;
-      border-bottom:1px solid #1e293b !important;
-      padding:5px 0 5px 0 !important;
-      margin:0 !important;
-  }
-
-  .st-key-upl > div {
-      max-width:1280px !important;
-      margin:0 auto !important;
-      padding:0 10px !important;
-  }
-
-  /* remove Streamlit column gutters from the compact row */
-  .st-key-upl [data-testid="stHorizontalBlock"] {
-      gap:10px !important;
-      align-items:end !important;
-  }
-
-  .st-key-upl [data-testid="column"] {
-      padding:0 !important;
-      min-width:0 !important;
-  }
-
-  .st-key-upl label[data-testid="stWidgetLabel"] {
-      min-height:0 !important;
-      height:10px !important;
-      margin:0 0 2px 0 !important;
-      padding:0 !important;
-  }
-
-  .st-key-upl label[data-testid="stWidgetLabel"] p {
-      font-size:8px !important;
-      line-height:9px !important;
-      color:#cbd5e1 !important;
-      margin:0 !important;
-      padding:0 !important;
-      font-weight:600 !important;
-      text-transform:uppercase !important;
-      letter-spacing:.35px !important;
-  }
-
-  /* ---------- FILE UPLOADERS ---------- */
-  .st-key-upl [data-testid="stFileUploader"] {
-      height:28px !important;
-      min-height:28px !important;
-      max-height:28px !important;
-      margin:0 !important;
-      padding:0 !important;
-      overflow:hidden !important;
-  }
-
-  .st-key-upl [data-testid="stFileUploaderDropzone"] {
-      height:28px !important;
-      min-height:28px !important;
-      max-height:28px !important;
-      padding:0 5px !important;
-      margin:0 !important;
-      box-sizing:border-box !important;
-      background:#1e293b !important;
-      border:1px solid #334155 !important;
-      border-radius:3px !important;
-      display:flex !important;
-      align-items:center !important;
-  }
-
-  .st-key-upl [data-testid="stFileUploaderDropzone"] section {
-      height:26px !important;
-      min-height:26px !important;
-      padding:0 !important;
-      margin:0 !important;
-      display:flex !important;
-      align-items:center !important;
-  }
-
-  .st-key-upl [data-testid="stFileUploaderDropzoneInstructions"] {
-      display:flex !important;
-      align-items:center !important;
-      padding:0 !important;
-      margin:0 !important;
-      height:26px !important;
-  }
-
-  .st-key-upl [data-testid="stFileUploaderDropzoneInstructions"] span,
-  .st-key-upl [data-testid="stFileUploaderDropzoneInstructions"] small {
-      font-size:8px !important;
-      line-height:24px !important;
-      color:#94a3b8 !important;
-      padding:0 !important;
-      margin:0 !important;
-  }
-
-  .st-key-upl [data-testid="stFileUploaderDropzone"] button {
-      height:22px !important;
-      min-height:22px !important;
-      max-height:22px !important;
-      padding:0 7px !important;
-      margin:0 !important;
-      font-size:9px !important;
-      line-height:20px !important;
-      border-radius:3px !important;
-  }
-
-  .st-key-upl [data-testid="stFileUploader"]:has([data-testid="stFileUploaderFile"]) [data-testid="stFileUploaderDropzone"] {
-      display:none !important;
-  }
-
-  .st-key-upl [data-testid="stFileUploaderFile"] {
-      height:28px !important;
-      min-height:28px !important;
-      max-height:28px !important;
-      padding:0 6px !important;
-      margin:0 !important;
-      display:flex !important;
-      align-items:center !important;
-      background:#1e293b !important;
-      border:1px solid #334155 !important;
-      border-radius:3px !important;
-  }
-
-  .st-key-upl [data-testid="stFileUploaderFile"] * {
-      color:#e2e8f0 !important;
-      font-size:9px !important;
-      line-height:22px !important;
-  }
-
-  .st-key-upl [data-testid="stFileUploaderFile"] small {
-      display:none !important;
-  }
-
-  /* ---------- SIGNUM ---------- */
-  .st-key-upl [data-testid="stTextInput"] {
-      height:28px !important;
-      min-height:28px !important;
-      max-height:28px !important;
-      margin:0 !important;
-      padding:0 !important;
-  }
-
-  .st-key-upl [data-testid="stTextInput"] > div {
-      height:28px !important;
-      min-height:28px !important;
-      max-height:28px !important;
-      margin:0 !important;
-      padding:0 !important;
-  }
-
-  .st-key-upl [data-testid="stTextInput"] div[data-baseweb="input"] {
-      height:28px !important;
-      min-height:28px !important;
-      max-height:28px !important;
-      margin:0 !important;
-      padding:0 !important;
-      box-sizing:border-box !important;
-      background:#1e293b !important;
-      border:1px solid #334155 !important;
-      border-radius:3px !important;
-  }
-
-  .st-key-upl [data-testid="stTextInput"] input {
-      height:26px !important;
-      min-height:26px !important;
-      max-height:26px !important;
-      padding:0 7px !important;
-      margin:0 !important;
-      font-size:9px !important;
-      line-height:24px !important;
-      color:#e2e8f0 !important;
-      background:transparent !important;
-      border:0 !important;
-      box-sizing:border-box !important;
-  }
-
-  .st-key-upl [data-testid="stTextInput"] input::placeholder {
-      color:#94a3b8 !important;
-      opacity:1 !important;
-  }
-
-  .st-key-upl [data-testid="InputInstructions"] { display:none !important; }
-
-  /* ---------- GO ---------- */
-  .st-key-upl [data-testid="stButton"] {
-      height:28px !important;
-      min-height:28px !important;
-      max-height:28px !important;
-      margin:0 !important;
-      padding:0 !important;
-  }
-
-  .st-key-upl [data-testid="stButton"] button,
-  .st-key-upl div.stButton > button {
-      width:100% !important;
-      height:28px !important;
-      min-height:28px !important;
-      max-height:28px !important;
-      margin:0 !important;
-      padding:0 12px !important;
-      font-size:9px !important;
-      line-height:26px !important;
-      font-weight:600 !important;
-      border-radius:3px !important;
-      box-sizing:border-box !important;
-  }
-
-  .st-key-upl div.stButton > button[kind="primary"] {
-      background:#2563eb !important;
-      border:1px solid #3b82f6 !important;
-      color:#fff !important;
-  }
-
-  .st-key-upl div.stButton > button:disabled {
-      background:#1e293b !important;
-      color:#64748b !important;
-      border:1px solid #334155 !important;
-  }
-
-  /* ---------- STATUS ---------- */
-  .st-key-upl .stat-line {
-      height:28px !important;
-      line-height:28px !important;
-      font-size:8px !important;
-      white-space:nowrap !important;
-      overflow:hidden !important;
-      text-overflow:ellipsis !important;
-      margin:0 !important;
-      padding:0 !important;
-  }
-
-  /* map frame */
-  .stApp iframe {
-      height:calc(100vh - 132px);
-      width:100%;
-      border:0;
-      display:block;
-  }
-
-  .landing {
-      height:calc(100vh - 132px);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      color:#64748b;
-      text-align:center;
-  }
-
-  /* footer */
-  .app-ftr {
-      position:fixed;
-      left:0;
-      right:0;
-      bottom:0;
-      height:26px;
-      background:#0d1220;
-      border-top:1px solid #1e293b;
-      color:#cbd5e1;
-      font-size:11px;
-      display:flex;
-      align-items:center;
-      justify-content:flex-start;
-      padding:0 14px;
-      z-index:99999;
-  }
-
-  .app-ftr a {
-      color:#60a5fa;
-      text-decoration:none;
-      margin-left:4px;
-  }
-
-  .ov {
-      position:fixed;
-      inset:0;
-      background:rgba(10,14,26,.86);
-      z-index:100000;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-  }
-
+  /* header (top) */
+  .app-hdr { background:linear-gradient(90deg,#0b1d46 0%,#12306b 100%); color:#fff; font-size:18pt; font-weight:600; letter-spacing:.3px;
+             padding:8px 22px; height:52px; box-sizing:border-box; display:flex; align-items:center; border-bottom:2px solid #3b82f6; white-space:nowrap; }
+  /* slim upload bar: three equal boxes (34px) */
+  .st-key-upl { background:#0d1220; border-bottom:1px solid #1e293b; padding:2px 10px 3px 10px; }
+  label[data-testid="stWidgetLabel"] { min-height:0 !important; margin:0 0 1px 0 !important; }
+  label[data-testid="stWidgetLabel"] p { font-size:8px !important; color:#cbd5e1 !important; margin:0 !important; font-weight:600; text-transform:uppercase; letter-spacing:.35px; line-height:9px !important; }
+  [data-testid="stFileUploader"], [data-testid="stTextInput"] { margin:0 !important; }
+  [data-testid="stFileUploader"] { height:28px !important; min-height:28px !important; overflow:hidden !important; margin:0 !important; }
+  [data-testid="stFileUploaderDropzone"], [data-testid="stFileUploaderFile"], [data-testid="stTextInput"] input, [data-testid="stTextInput"] div[data-baseweb="input"] {
+      min-height:28px !important; height:28px !important; box-sizing:border-box; background:#1e293b !important; border:1px solid #334155 !important; border-radius:3px !important; }
+  [data-testid="stFileUploaderDropzone"] { padding:0 6px !important; }
+  [data-testid="stFileUploaderDropzoneInstructions"] { display:none !important; }
+  [data-testid="stFileUploaderDropzone"] small, [data-testid="stFileUploaderDropzone"] span { color:#94a3b8 !important; font-size:9px !important; }
+  [data-testid="stFileUploader"]:has([data-testid="stFileUploaderFile"]) [data-testid="stFileUploaderDropzone"] { display:none !important; }   /* once a file is attached: show only the file row */
+  [data-testid="stFileUploaderFile"] { padding:0 6px !important; margin:0 !important; display:flex; align-items:center; height:28px !important; min-height:28px !important; }
+  [data-testid="stFileUploaderFile"] * { color:#e2e8f0 !important; font-size:9px !important; }
+  [data-testid="stFileUploaderFile"] small { display:none !important; }
+  [data-testid="stTextInput"] input { color:#e2e8f0 !important; font-size:9px !important; padding:0 7px !important; height:26px !important; min-height:26px !important; }
+  [data-testid="stTextInput"] input::placeholder { color:#94a3b8 !important; opacity:1 !important; }
+  [data-testid="InputInstructions"] { display:none !important; }
+  div.stButton > button { height:28px !important; min-height:28px !important; font-weight:600; border-radius:3px; padding:0 10px !important; font-size:9px !important; }
+  div.stButton > button[kind="primary"] { background:#2563eb; border:1px solid #3b82f6; color:#fff; }
+  div.stButton > button:disabled { background:#1e293b !important; color:#64748b !important; border:1px solid #334155 !important; }
+  .stat-line { font-size:8px; line-height:28px; height:28px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* map frame fills the space between upload bar and footer */
+  .stApp iframe { height:calc(100vh - 150px); width:100%; border:0; display:block; }
+  .landing { height:calc(100vh - 150px); display:flex; align-items:center; justify-content:center; color:#64748b; text-align:center; }
+  /* footer (always on the bottom line) */
+  .app-ftr { position:fixed; left:0; right:0; bottom:0; height:26px; background:#0d1220; border-top:1px solid #1e293b; color:#cbd5e1; font-size:11px;
+             display:flex; align-items:center; justify-content:flex-start; padding:0 14px; z-index:99999; }
+  .app-ftr a { color:#60a5fa; text-decoration:none; margin-left:4px; }
+  /* loading message in the middle of the page */
+  .ov { position:fixed; inset:0; background:rgba(10,14,26,.86); z-index:100000; display:flex; align-items:center; justify-content:center; }
   .ov-box { text-align:center; color:#e2e8f0; }
-  .ov-t { font-size:18px; font-weight:600; margin-top:16px; }
-  .ov-s { font-size:12px; color:#94a3b8; margin-top:6px; }
-
-  .spin {
-      width:54px;
-      height:54px;
-      border:6px solid #1e293b;
-      border-top-color:#3b82f6;
-      border-radius:50%;
-      margin:0 auto;
-      animation:sp .9s linear infinite;
-  }
-
+  .ov-t { font-size:18px; font-weight:600; margin-top:16px; } .ov-s { font-size:12px; color:#94a3b8; margin-top:6px; }
+  .spin { width:54px; height:54px; border:6px solid #1e293b; border-top-color:#3b82f6; border-radius:50%; margin:0 auto; animation:sp .9s linear infinite; }
   @keyframes sp { to { transform:rotate(360deg); } }
 </style>
 """
@@ -1032,96 +744,46 @@ def main():
     log_url, log_token = secret("LOG_WEBHOOK_URL"), secret("LOG_TOKEN")
     st.session_state.setdefault("u_id", "")
 
-    # Keep the existing functionality, but use a compact centered control row.
     bar = st.container(key="upl")
     with bar:
-        # Spacer + 4 compact controls + status + spacer.
-        # The Go column is deliberately small; it is NOT stretched to fill the page.
-        c0, c1, c2, c3, c4, c5 = st.columns(
-            [1.35, 2.65, 2.65, 1.75, 0.85, 2.15],
-            gap="small",
-            vertical_alignment="bottom",
-        )
-
+        c1, c2, c3, c4, c5 = cols([3.0, 3.0, 2.0, 0.9, 3.0])
         with c1:
-            site_file = st.file_uploader(
-                "Site data (CSV)",
-                type=["csv"],
-                key="site",
-            )
-
+            site_file = st.file_uploader("Site data (CSV)", type=["csv"], key="site")
         with c2:
-            nbr_file = st.file_uploader(
-                "SQL table (XLSX / CSV)",
-                type=["xlsx", "xls", "csv"],
-                key="nbr",
-            )
-
+            nbr_file = st.file_uploader("SQL table (XLSX / CSV)", type=["xlsx", "xls", "csv"], key="nbr")
         with c3:
-            st.text_input(
-                "SIGNUM ID",
-                key="u_id",
-                placeholder="Enter SIGNUM ID",
-                max_chars=20,
-            )
-
+            st.text_input("SIGNUM ID", key="u_id", placeholder="Enter SIGNUM ID", max_chars=20)
         signum = clean_signum(st.session_state.u_id)
-        ready = bool(site_file and nbr_file and signum)
-
+        ready = bool(site_file and nbr_file and signum)          # nothing loads unless ALL THREE inputs are valid
         with c4:
-            go = st.button(
-                "▶ Go",
-                type="primary",
-                disabled=not ready,
-                use_container_width=True,
-                key="go",
-            )
-
+            go = st.button("▶ Go", type="primary", disabled=not ready, use_container_width=True, key="go")
         status = c5.empty()
 
     cur_sig = (sig(site_file), sig(nbr_file))
 
     if go and not ready:
         st.warning("Please provide the Site file, the SQL table and a valid SIGNUM ID.")
-
     if go and ready:
         user = {"id": signum, "email": auth_email()}
         ph = st.empty()
         try:
             ph.markdown(overlay("Loading data ...", "Reading site file"), unsafe_allow_html=True)
             site_df = read_upload(site_file)
-
             ph.markdown(overlay("Loading data ...", "Reading SQL table"), unsafe_allow_html=True)
             nbr_df = read_upload(nbr_file)
-
-            ph.markdown(
-                overlay("Loading data ...", "Building the map - this can take a few seconds"),
-                unsafe_allow_html=True,
-            )
-
+            ph.markdown(overlay("Loading data ...", "Building the map - this can take a few seconds"), unsafe_allow_html=True)
             payload = build_payload(site_df, nbr_df, user, log_url, log_token)
             st.session_state["map_html"] = render_html(payload)
             st.session_state["loaded_sig"] = cur_sig
-            st.session_state["loaded_info"] = (
-                f"{len(payload['sites']):,} sites | {len(payload['nbr']):,} clusters"
-            )
-            post_log(
-                log_url,
-                log_token,
-                "go",
-                user,
-                f"{site_file.name} | {nbr_file.name}",
-            )
-
+            st.session_state["loaded_info"] = f"{len(payload['sites']):,} sites | {len(payload['nbr']):,} clusters"
+            post_log(log_url, log_token, "go", user, f"{site_file.name} | {nbr_file.name}")
         except Exception as e:
             st.session_state.pop("map_html", None)
             ph.empty()
             st.error(f"Could not load the files: {e}")
-
         ph.empty()
 
     loaded = st.session_state.get("loaded_sig") is not None and "map_html" in st.session_state
-
     if loaded and st.session_state["loaded_sig"] == cur_sig:
         msg, color = f"✓ Loaded - {st.session_state['loaded_info']}", "#10b981"
     elif loaded:
@@ -1129,39 +791,21 @@ def main():
     elif not (site_file and nbr_file):
         msg, color = "Upload both files and enter SIGNUM ID", "#64748b"
     elif not signum:
-        msg, color = (
-            "Enter a valid SIGNUM ID"
-            if st.session_state.u_id.strip()
-            else "Enter SIGNUM ID"
-        ), "#f59e0b"
+        msg, color = ("Enter a valid SIGNUM ID" if st.session_state.u_id.strip() else "Enter SIGNUM ID"), "#f59e0b"
     else:
         msg, color = "Ready - click Go", "#60a5fa"
-
-    status.markdown(
-        f'<div class="stat-line" style="color:{color}">{msg}</div>',
-        unsafe_allow_html=True,
-    )
+    status.markdown(f'<div class="stat-line" style="color:{color}">{msg}</div>', unsafe_allow_html=True)
 
     if "map_html" in st.session_state:
         show_map(st.session_state["map_html"])
     else:
         st.markdown(
             '<div class="landing"><div><div style="font-size:46px;margin-bottom:14px">📡</div>'
-            '<div style="font-size:18px;color:#94a3b8;margin-bottom:8px">'
-            'Upload both files, enter your SIGNUM ID, then press '
-            '<b style="color:#60a5fa">Go</b></div>'
-            '<div style="font-size:12px;line-height:1.7">'
-            '1. <b>Site data</b> (CSV): USID, coordinates, azimuth, cell<br>'
-            '2. <b>SQL table</b> (Excel / CSV): neighbour relations and HO data'
-            '</div></div></div>',
-            unsafe_allow_html=True,
-        )
+            '<div style="font-size:18px;color:#94a3b8;margin-bottom:8px">Upload both files, enter your SIGNUM ID, then press <b style="color:#60a5fa">Go</b></div>'
+            '<div style="font-size:12px;line-height:1.7">1. <b>Site data</b> (CSV): USID, coordinates, azimuth, cell<br>2. <b>SQL table</b> (Excel / CSV): neighbour relations and HO data</div></div></div>',
+            unsafe_allow_html=True)
 
-    st.markdown(
-        f'<div class="app-ftr">{SUPPORT_NAME} for any support, please connect with '
-        f'<a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a></div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(f'<div class="app-ftr">{SUPPORT_NAME} for any support, please connect with <a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a></div>', unsafe_allow_html=True)
 
 
 main()
