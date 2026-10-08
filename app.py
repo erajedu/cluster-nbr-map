@@ -672,65 +672,229 @@ PAGE_CSS = """
   div[data-testid="stVerticalBlock"] { gap:0 !important; }
   .element-container { margin-bottom:0 !important; }
 
-  /* Header */
-  .app-hdr { background:linear-gradient(90deg,#0b1d46 0%,#12306b 100%); color:#fff; font-size:18pt; font-weight:600; letter-spacing:.3px;
-             padding:8px 16px; height:52px; box-sizing:border-box; display:flex; align-items:center; border-bottom:2px solid #3b82f6; white-space:nowrap; }
+  /* Main header */
+  .app-hdr {
+      background:linear-gradient(90deg,#0b1d46 0%,#12306b 100%);
+      color:#fff; font-size:18pt; font-weight:600; letter-spacing:.3px;
+      padding:8px 16px; height:52px; box-sizing:border-box;
+      display:flex; align-items:center; border-bottom:2px solid #3b82f6;
+      white-space:nowrap;
+  }
 
-  /* Compact top input bar */
-  .st-key-upl { background:#0d1220 !important; border-bottom:1px solid #1e293b !important; padding:2px 8px 3px 8px !important; margin:0 !important; }
+  /* ================================================================
+     TOP INPUT BAR
+     Keep all five columns on exactly one compact row.
+     ================================================================ */
+  .st-key-upl {
+      background:#0d1220 !important;
+      border-bottom:1px solid #1e293b !important;
+      padding:2px 8px 2px 8px !important;
+      margin:0 !important;
+  }
 
-  .st-key-upl label[data-testid="stWidgetLabel"] { min-height:0 !important; height:auto !important; margin:0 !important; padding:0 !important; }
-  .st-key-upl label[data-testid="stWidgetLabel"] p { font-size:8px !important; color:#cbd5e1 !important; margin:0 !important; padding:0 !important;
-      font-weight:600 !important; text-transform:uppercase !important; letter-spacing:.25px !important; line-height:9px !important; }
+  .st-key-upl > div[data-testid="stVerticalBlock"] {
+      gap:0 !important;
+      align-items:end !important;
+  }
 
+  .st-key-upl [data-testid="column"] {
+      padding:0 4px !important;
+      margin:0 !important;
+      min-width:0 !important;
+  }
+  .st-key-upl [data-testid="column"]:first-child { padding-left:0 !important; }
+  .st-key-upl [data-testid="column"]:last-child { padding-right:0 !important; }
+
+  /* Labels */
+  .st-key-upl label[data-testid="stWidgetLabel"] {
+      display:block !important;
+      min-height:0 !important;
+      height:10px !important;
+      margin:0 0 1px 0 !important;
+      padding:0 !important;
+  }
+  .st-key-upl label[data-testid="stWidgetLabel"] p {
+      font-size:8px !important;
+      line-height:9px !important;
+      height:9px !important;
+      color:#cbd5e1 !important;
+      margin:0 !important;
+      padding:0 !important;
+      font-weight:600 !important;
+      text-transform:uppercase !important;
+      letter-spacing:.25px !important;
+  }
+
+  /* Common widget wrapper cleanup */
   .st-key-upl [data-testid="stFileUploader"],
-  .st-key-upl [data-testid="stTextInput"] { margin:0 !important; padding:0 !important; }
+  .st-key-upl [data-testid="stTextInput"],
+  .st-key-upl [data-testid="stButton"] {
+      margin:0 !important;
+      padding:0 !important;
+  }
 
-  /* File uploaders */
-  .st-key-upl [data-testid="stFileUploader"] { height:24px !important; min-height:24px !important; max-height:24px !important; overflow:hidden !important; }
+  /* ---------------- FILE UPLOADERS ---------------- */
+  .st-key-upl [data-testid="stFileUploader"] {
+      height:25px !important;
+      min-height:25px !important;
+      max-height:25px !important;
+      overflow:hidden !important;
+  }
   .st-key-upl [data-testid="stFileUploaderDropzone"],
   .st-key-upl [data-testid="stFileUploaderFile"] {
-      min-height:24px !important; height:24px !important; max-height:24px !important; box-sizing:border-box !important;
-      background:#1e293b !important; border:1px solid #334155 !important; border-radius:3px !important;
+      height:25px !important;
+      min-height:25px !important;
+      max-height:25px !important;
+      box-sizing:border-box !important;
+      background:#1e293b !important;
+      border:1px solid #334155 !important;
+      border-radius:3px !important;
+      margin:0 !important;
   }
-  .st-key-upl [data-testid="stFileUploaderDropzone"] { padding:0 5px !important; margin:0 !important; display:flex !important; align-items:center !important; }
-  .st-key-upl [data-testid="stFileUploaderDropzone"] section { min-height:22px !important; height:22px !important; padding:0 !important; margin:0 !important; }
-  .st-key-upl [data-testid="stFileUploaderDropzoneInstructions"] { display:none !important; padding:0 !important; margin:0 !important; }
+  .st-key-upl [data-testid="stFileUploaderDropzone"] {
+      padding:0 5px !important;
+      display:flex !important;
+      align-items:center !important;
+  }
+  .st-key-upl [data-testid="stFileUploaderDropzone"] section {
+      height:23px !important;
+      min-height:23px !important;
+      padding:0 !important;
+      margin:0 !important;
+      display:flex !important;
+      align-items:center !important;
+  }
+  .st-key-upl [data-testid="stFileUploaderDropzoneInstructions"] {
+      display:none !important;
+      padding:0 !important;
+      margin:0 !important;
+  }
   .st-key-upl [data-testid="stFileUploaderDropzone"] button {
-      min-height:20px !important; height:20px !important; max-height:20px !important; padding:0 6px !important; margin:0 !important;
-      font-size:8px !important; line-height:18px !important;
+      height:21px !important;
+      min-height:21px !important;
+      max-height:21px !important;
+      padding:0 6px !important;
+      margin:0 !important;
+      font-size:8px !important;
+      line-height:19px !important;
   }
   .st-key-upl [data-testid="stFileUploaderDropzone"] small,
-  .st-key-upl [data-testid="stFileUploaderDropzone"] span { color:#94a3b8 !important; font-size:8px !important; line-height:20px !important; }
-  .st-key-upl [data-testid="stFileUploader"]:has([data-testid="stFileUploaderFile"]) [data-testid="stFileUploaderDropzone"] { display:none !important; }
-  .st-key-upl [data-testid="stFileUploaderFile"] { padding:0 5px !important; margin:0 !important; display:flex !important; align-items:center !important; }
-  .st-key-upl [data-testid="stFileUploaderFile"] * { color:#e2e8f0 !important; font-size:9px !important; line-height:20px !important; }
+  .st-key-upl [data-testid="stFileUploaderDropzone"] span {
+      color:#94a3b8 !important;
+      font-size:8px !important;
+      line-height:20px !important;
+  }
+  .st-key-upl [data-testid="stFileUploader"]:has([data-testid="stFileUploaderFile"]) [data-testid="stFileUploaderDropzone"] {
+      display:none !important;
+  }
+  .st-key-upl [data-testid="stFileUploaderFile"] {
+      padding:0 5px !important;
+      display:flex !important;
+      align-items:center !important;
+  }
+  .st-key-upl [data-testid="stFileUploaderFile"] * {
+      color:#e2e8f0 !important;
+      font-size:9px !important;
+      line-height:20px !important;
+  }
   .st-key-upl [data-testid="stFileUploaderFile"] small { display:none !important; }
 
-  /* SIGNUM input */
-  .st-key-upl [data-testid="stTextInput"] { height:24px !important; min-height:24px !important; max-height:24px !important; }
-  .st-key-upl [data-testid="stTextInput"] > div { height:24px !important; min-height:24px !important; margin:0 !important; padding:0 !important; }
+  /* ---------------- SIGNUM INPUT ---------------- */
+  .st-key-upl [data-testid="stTextInput"] {
+      height:25px !important;
+      min-height:25px !important;
+      max-height:25px !important;
+      overflow:visible !important;
+  }
+  .st-key-upl [data-testid="stTextInput"] > div,
+  .st-key-upl [data-testid="stTextInput"] > div > div {
+      height:25px !important;
+      min-height:25px !important;
+      max-height:25px !important;
+      margin:0 !important;
+      padding:0 !important;
+      box-sizing:border-box !important;
+  }
+  .st-key-upl [data-testid="stTextInput"] div[data-baseweb="base-input"],
   .st-key-upl [data-testid="stTextInput"] div[data-baseweb="input"] {
-      min-height:24px !important; height:24px !important; max-height:24px !important; box-sizing:border-box !important;
-      background:#1e293b !important; border:1px solid #334155 !important; border-radius:3px !important; margin:0 !important; padding:0 !important;
+      height:25px !important;
+      min-height:25px !important;
+      max-height:25px !important;
+      box-sizing:border-box !important;
+      background:#1e293b !important;
+      border:1px solid #334155 !important;
+      border-radius:3px !important;
+      margin:0 !important;
+      padding:0 !important;
   }
   .st-key-upl [data-testid="stTextInput"] input {
-      color:#e2e8f0 !important; height:22px !important; min-height:22px !important; padding:0 6px !important; margin:0 !important;
-      font-size:9px !important; line-height:20px !important;
+      display:block !important;
+      width:100% !important;
+      height:23px !important;
+      min-height:23px !important;
+      max-height:23px !important;
+      box-sizing:border-box !important;
+      color:#e2e8f0 !important;
+      background:transparent !important;
+      border:0 !important;
+      outline:0 !important;
+      padding:0 6px !important;
+      margin:0 !important;
+      font-size:9px !important;
+      line-height:21px !important;
   }
-  .st-key-upl [data-testid="stTextInput"] input::placeholder { color:#94a3b8 !important; opacity:1 !important; }
+  .st-key-upl [data-testid="stTextInput"] input::placeholder {
+      color:#94a3b8 !important;
+      opacity:1 !important;
+  }
   .st-key-upl [data-testid="InputInstructions"] { display:none !important; }
 
-  /* Go button */
-  .st-key-upl div.stButton > button {
-      height:24px !important; min-height:24px !important; max-height:24px !important; font-weight:600 !important;
-      border-radius:3px !important; padding:0 8px !important; font-size:9px !important; line-height:22px !important;
+  /* ---------------- GO BUTTON ----------------
+     Requested compact rectangular button, approximately 6 x 2 cm.
+     CSS uses cm so its physical intent is explicit; max-height keeps
+     the top bar from growing beyond the compact row.
+     */
+  .st-key-upl [data-testid="stButton"] {
+      height:25px !important;
+      min-height:25px !important;
+      max-height:25px !important;
   }
-  .st-key-upl div.stButton > button[kind="primary"] { background:#2563eb !important; border:1px solid #3b82f6 !important; color:#fff !important; }
-  .st-key-upl div.stButton > button:disabled { background:#1e293b !important; color:#64748b !important; border:1px solid #334155 !important; }
+  .st-key-upl div.stButton > button {
+      width:6cm !important;
+      height:25px !important;
+      min-height:25px !important;
+      max-height:25px !important;
+      box-sizing:border-box !important;
+      padding:0 10px !important;
+      margin:0 auto !important;
+      display:block !important;
+      font-size:9px !important;
+      line-height:23px !important;
+      font-weight:600 !important;
+      border-radius:3px !important;
+  }
+  .st-key-upl div.stButton > button[kind="primary"] {
+      background:#2563eb !important;
+      border:1px solid #3b82f6 !important;
+      color:#fff !important;
+  }
+  .st-key-upl div.stButton > button:disabled {
+      background:#1e293b !important;
+      color:#64748b !important;
+      border:1px solid #334155 !important;
+  }
 
   /* Status text */
-  .st-key-upl .stat-line { font-size:8px !important; line-height:24px !important; height:24px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .st-key-upl .stat-line {
+      height:25px !important;
+      line-height:25px !important;
+      font-size:8px !important;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      margin:0 !important;
+      padding:0 !important;
+  }
 
   /* Map frame */
   .stApp iframe { height:calc(100vh - 150px); width:100%; border:0; display:block; }
@@ -788,7 +952,7 @@ def main():
     except TypeError:
         bar = st.container()
     with bar:
-        c1, c2, c3, c4, c5 = cols([3.0, 3.0, 2.0, 0.9, 3.0])
+        c1, c2, c3, c4, c5 = cols([3.2, 3.2, 2.0, 1.6, 2.8])
         with c1:
             site_file = st.file_uploader("Site data (CSV)", type=["csv"], key="site")
         with c2:
