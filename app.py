@@ -672,73 +672,85 @@ PAGE_CSS = """
   div[data-testid="stVerticalBlock"] { gap:0 !important; }
   .element-container { margin-bottom:0 !important; }
 
+  /* Header */
   .app-hdr { background:linear-gradient(90deg,#0b1d46 0%,#12306b 100%); color:#fff; font-size:18pt; font-weight:600; letter-spacing:.3px;
-             padding:8px 22px; height:52px; box-sizing:border-box; display:flex; align-items:center; border-bottom:2px solid #3b82f6; white-space:nowrap; }
+             padding:8px 16px; height:52px; box-sizing:border-box; display:flex; align-items:center; border-bottom:2px solid #3b82f6; white-space:nowrap; }
 
-  /* ================================================================
-     COMPACT TOP BAR TEST CSS
-     This intentionally applies to the real Streamlit widgets globally
-     so we can verify the selectors before relying on .st-key-upl.
-     ================================================================ */
+  /* Compact top input bar */
   .st-key-upl { background:#0d1220 !important; border-bottom:1px solid #1e293b !important; padding:2px 8px 3px 8px !important; margin:0 !important; }
 
-  label[data-testid="stWidgetLabel"] { min-height:0 !important; height:auto !important; margin:0 0 1px 0 !important; padding:0 !important; }
-  label[data-testid="stWidgetLabel"] p { font-size:8px !important; color:#ffffff !important; margin:0 !important; font-weight:600; text-transform:uppercase; letter-spacing:.3px; line-height:9px !important; padding:0 !important; }
+  .st-key-upl label[data-testid="stWidgetLabel"] { min-height:0 !important; height:auto !important; margin:0 !important; padding:0 !important; }
+  .st-key-upl label[data-testid="stWidgetLabel"] p { font-size:8px !important; color:#cbd5e1 !important; margin:0 !important; padding:0 !important;
+      font-weight:600 !important; text-transform:uppercase !important; letter-spacing:.25px !important; line-height:9px !important; }
 
-  [data-testid="stFileUploader"], [data-testid="stTextInput"] { margin:0 !important; padding:0 !important; }
-  [data-testid="stFileUploader"] { height:24px !important; min-height:24px !important; max-height:24px !important; overflow:hidden !important; }
-  [data-testid="stFileUploaderDropzone"], [data-testid="stFileUploaderFile"] {
+  .st-key-upl [data-testid="stFileUploader"],
+  .st-key-upl [data-testid="stTextInput"] { margin:0 !important; padding:0 !important; }
+
+  /* File uploaders */
+  .st-key-upl [data-testid="stFileUploader"] { height:24px !important; min-height:24px !important; max-height:24px !important; overflow:hidden !important; }
+  .st-key-upl [data-testid="stFileUploaderDropzone"],
+  .st-key-upl [data-testid="stFileUploaderFile"] {
       min-height:24px !important; height:24px !important; max-height:24px !important; box-sizing:border-box !important;
       background:#1e293b !important; border:1px solid #334155 !important; border-radius:3px !important;
   }
-  [data-testid="stFileUploaderDropzone"] { padding:0 5px !important; margin:0 !important; display:flex !important; align-items:center !important; }
-  [data-testid="stFileUploaderDropzone"] section { min-height:22px !important; height:22px !important; padding:0 !important; margin:0 !important; }
-  [data-testid="stFileUploaderDropzoneInstructions"] { display:none !important; padding:0 !important; margin:0 !important; }
-  [data-testid="stFileUploaderDropzone"] button { min-height:20px !important; height:20px !important; max-height:20px !important; padding:0 6px !important; margin:0 !important; font-size:8px !important; line-height:18px !important; }
-  [data-testid="stFileUploaderDropzone"] small, [data-testid="stFileUploaderDropzone"] span { color:#94a3b8 !important; font-size:8px !important; line-height:20px !important; }
-  [data-testid="stFileUploader"]:has([data-testid="stFileUploaderFile"]) [data-testid="stFileUploaderDropzone"] { display:none !important; }
-  [data-testid="stFileUploaderFile"] { padding:0 5px !important; margin:0 !important; display:flex !important; align-items:center !important; }
-  [data-testid="stFileUploaderFile"] * { color:#e2e8f0 !important; font-size:9px !important; line-height:20px !important; }
-  [data-testid="stFileUploaderFile"] small { display:none !important; }
+  .st-key-upl [data-testid="stFileUploaderDropzone"] { padding:0 5px !important; margin:0 !important; display:flex !important; align-items:center !important; }
+  .st-key-upl [data-testid="stFileUploaderDropzone"] section { min-height:22px !important; height:22px !important; padding:0 !important; margin:0 !important; }
+  .st-key-upl [data-testid="stFileUploaderDropzoneInstructions"] { display:none !important; padding:0 !important; margin:0 !important; }
+  .st-key-upl [data-testid="stFileUploaderDropzone"] button {
+      min-height:20px !important; height:20px !important; max-height:20px !important; padding:0 6px !important; margin:0 !important;
+      font-size:8px !important; line-height:18px !important;
+  }
+  .st-key-upl [data-testid="stFileUploaderDropzone"] small,
+  .st-key-upl [data-testid="stFileUploaderDropzone"] span { color:#94a3b8 !important; font-size:8px !important; line-height:20px !important; }
+  .st-key-upl [data-testid="stFileUploader"]:has([data-testid="stFileUploaderFile"]) [data-testid="stFileUploaderDropzone"] { display:none !important; }
+  .st-key-upl [data-testid="stFileUploaderFile"] { padding:0 5px !important; margin:0 !important; display:flex !important; align-items:center !important; }
+  .st-key-upl [data-testid="stFileUploaderFile"] * { color:#e2e8f0 !important; font-size:9px !important; line-height:20px !important; }
+  .st-key-upl [data-testid="stFileUploaderFile"] small { display:none !important; }
 
-  [data-testid="stTextInput"] { height:24px !important; min-height:24px !important; max-height:24px !important; }
-  [data-testid="stTextInput"] > div { height:24px !important; min-height:24px !important; margin:0 !important; padding:0 !important; }
-  [data-testid="stTextInput"] div[data-baseweb="input"] {
+  /* SIGNUM input */
+  .st-key-upl [data-testid="stTextInput"] { height:24px !important; min-height:24px !important; max-height:24px !important; }
+  .st-key-upl [data-testid="stTextInput"] > div { height:24px !important; min-height:24px !important; margin:0 !important; padding:0 !important; }
+  .st-key-upl [data-testid="stTextInput"] div[data-baseweb="input"] {
       min-height:24px !important; height:24px !important; max-height:24px !important; box-sizing:border-box !important;
       background:#1e293b !important; border:1px solid #334155 !important; border-radius:3px !important; margin:0 !important; padding:0 !important;
   }
-  [data-testid="stTextInput"] input { color:#e2e8f0 !important; height:22px !important; min-height:22px !important; padding:0 6px !important; margin:0 !important; font-size:9px !important; line-height:20px !important; }
-  [data-testid="stTextInput"] input::placeholder { color:#94a3b8 !important; opacity:1 !important; }
-  [data-testid="InputInstructions"] { display:none !important; }
+  .st-key-upl [data-testid="stTextInput"] input {
+      color:#e2e8f0 !important; height:22px !important; min-height:22px !important; padding:0 6px !important; margin:0 !important;
+      font-size:9px !important; line-height:20px !important;
+  }
+  .st-key-upl [data-testid="stTextInput"] input::placeholder { color:#94a3b8 !important; opacity:1 !important; }
+  .st-key-upl [data-testid="InputInstructions"] { display:none !important; }
 
-  div.stButton > button { height:24px !important; min-height:24px !important; max-height:24px !important; font-weight:600; border-radius:3px !important; padding:0 8px !important; font-size:9px !important; line-height:22px !important; }
-  div.stButton > button[kind="primary"] { background:#2563eb; border:1px solid #3b82f6; color:#fff; }
-  div.stButton > button:disabled { background:#1e293b !important; color:#64748b !important; border:1px solid #334155 !important; }
-  .stat-line { font-size:8px !important; line-height:24px !important; height:24px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* Go button */
+  .st-key-upl div.stButton > button {
+      height:24px !important; min-height:24px !important; max-height:24px !important; font-weight:600 !important;
+      border-radius:3px !important; padding:0 8px !important; font-size:9px !important; line-height:22px !important;
+  }
+  .st-key-upl div.stButton > button[kind="primary"] { background:#2563eb !important; border:1px solid #3b82f6 !important; color:#fff !important; }
+  .st-key-upl div.stButton > button:disabled { background:#1e293b !important; color:#64748b !important; border:1px solid #334155 !important; }
 
-  /* TEST MARKERS - deliberately obvious; remove after diagnosis */
-  .st-key-upl { outline:2px solid rgba(255,255,0,.9) !important; }
-  [data-testid="stFileUploader"] { outline:2px solid rgba(255,0,0,.55) !important; }
-  [data-testid="stTextInput"] { outline:2px solid rgba(0,255,0,.55) !important; }
-  div.stButton > button { outline:2px solid rgba(255,165,0,.65) !important; }
+  /* Status text */
+  .st-key-upl .stat-line { font-size:8px !important; line-height:24px !important; height:24px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
+  /* Map frame */
   .stApp iframe { height:calc(100vh - 150px); width:100%; border:0; display:block; }
   .landing { height:calc(100vh - 150px); display:flex; align-items:center; justify-content:center; color:#64748b; text-align:center; }
+
+  /* Footer */
   .app-ftr { position:fixed; left:0; right:0; bottom:0; height:26px; background:#0d1220; border-top:1px solid #1e293b; color:#cbd5e1; font-size:11px;
              display:flex; align-items:center; justify-content:flex-start; padding:0 14px; z-index:99999; }
   .app-ftr a { color:#60a5fa; text-decoration:none; margin-left:4px; }
+
+  /* Loading overlay */
   .ov { position:fixed; inset:0; background:rgba(10,14,26,.86); z-index:100000; display:flex; align-items:center; justify-content:center; }
   .ov-box { text-align:center; color:#e2e8f0; }
-  .ov-t { font-size:18px; font-weight:600; margin-top:16px; } .ov-s { font-size:12px; color:#94a3b8; margin-top:6px; }
+  .ov-t { font-size:18px; font-weight:600; margin-top:16px; }
+  .ov-s { font-size:12px; color:#94a3b8; margin-top:6px; }
   .spin { width:54px; height:54px; border:6px solid #1e293b; border-top-color:#3b82f6; border-radius:50%; margin:0 auto; animation:sp .9s linear infinite; }
   @keyframes sp { to { transform:rotate(360deg); } }
-
-  /* Diagnostic banner */
-  .diag-banner { background:#172033; border:1px solid #334155; color:#e2e8f0; padding:4px 8px; font:10px/14px monospace; margin:0; }
-  .diag-ok { color:#22c55e; font-weight:700; }
-  .diag-bad { color:#ef4444; font-weight:700; }
 </style>
 """
+
 
 def overlay(msg, sub=""):
     return f'<div class="ov"><div class="ov-box"><div class="spin"></div><div class="ov-t">{msg}</div><div class="ov-s">{sub}</div></div></div>'
@@ -768,29 +780,13 @@ def main():
     st.markdown(PAGE_CSS, unsafe_allow_html=True)
     st.markdown(f'<div class="app-hdr">{APP_TITLE}</div>', unsafe_allow_html=True)
 
-    # TEMPORARY DIAGNOSTICS - remove after testing.
-    st.markdown(
-        f'<div class="diag-banner">BUILD TEST: <b>COMPACT-UI-001</b> &nbsp;|&nbsp; Streamlit: <b>{st.__version__}</b></div>',
-        unsafe_allow_html=True,
-    )
-
     log_url, log_token = secret("LOG_WEBHOOK_URL"), secret("LOG_TOKEN")
     st.session_state.setdefault("u_id", "")
 
-    upl_key_works = True
     try:
         bar = st.container(key="upl")
     except TypeError:
-        upl_key_works = False
         bar = st.container()
-
-    st.markdown(
-        '<div class="diag-banner">Container key <b class="'
-        + ('diag-ok">WORKING' if upl_key_works else 'diag-bad">NOT WORKING - fallback container used')
-        + '</b> &nbsp;|&nbsp; CSS widget selectors are being tested with colored outlines.</div>',
-        unsafe_allow_html=True,
-    )
-
     with bar:
         c1, c2, c3, c4, c5 = cols([3.0, 3.0, 2.0, 0.9, 3.0])
         with c1:
