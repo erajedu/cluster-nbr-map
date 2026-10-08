@@ -682,50 +682,60 @@ PAGE_CSS = """
   }
 
   /* ================================================================
-     TOP INPUT BAR
-     Keep all five columns on exactly one compact row.
+     TOP INPUT BAR - compact centered control strip
+     The application functionality is unchanged.  The controls are
+     deliberately kept inside a centered max-width row so they do not
+     stretch across the entire browser window.
      ================================================================ */
   .st-key-upl {
       background:#0d1220 !important;
       border-bottom:1px solid #1e293b !important;
-      padding:2px 8px 2px 8px !important;
+      padding:2px 0 3px 0 !important;
       margin:0 !important;
+      width:100% !important;
   }
 
+  /* The Streamlit vertical block containing our five columns */
   .st-key-upl > div[data-testid="stVerticalBlock"] {
+      width:100% !important;
+      max-width:1450px !important;
+      margin:0 auto !important;
+      padding:0 !important;
       gap:0 !important;
-      align-items:end !important;
+      align-items:stretch !important;
   }
 
   .st-key-upl [data-testid="column"] {
-      padding:0 4px !important;
+      padding:0 5px !important;
       margin:0 !important;
       min-width:0 !important;
+      align-self:flex-end !important;
   }
   .st-key-upl [data-testid="column"]:first-child { padding-left:0 !important; }
   .st-key-upl [data-testid="column"]:last-child { padding-right:0 !important; }
 
-  /* Labels */
+  /* Labels: one small line directly above each control */
   .st-key-upl label[data-testid="stWidgetLabel"] {
       display:block !important;
       min-height:0 !important;
-      height:10px !important;
-      margin:0 0 1px 0 !important;
+      height:11px !important;
+      margin:0 0 2px 0 !important;
       padding:0 !important;
   }
   .st-key-upl label[data-testid="stWidgetLabel"] p {
       font-size:8px !important;
-      line-height:9px !important;
-      height:9px !important;
+      line-height:10px !important;
+      height:10px !important;
       color:#cbd5e1 !important;
       margin:0 !important;
       padding:0 !important;
       font-weight:600 !important;
       text-transform:uppercase !important;
       letter-spacing:.25px !important;
+      white-space:nowrap !important;
   }
 
-  /* Common widget wrapper cleanup */
+  /* Remove Streamlit's extra wrapper spacing */
   .st-key-upl [data-testid="stFileUploader"],
   .st-key-upl [data-testid="stTextInput"],
   .st-key-upl [data-testid="stButton"] {
@@ -735,16 +745,16 @@ PAGE_CSS = """
 
   /* ---------------- FILE UPLOADERS ---------------- */
   .st-key-upl [data-testid="stFileUploader"] {
-      height:25px !important;
-      min-height:25px !important;
-      max-height:25px !important;
+      height:26px !important;
+      min-height:26px !important;
+      max-height:26px !important;
       overflow:hidden !important;
   }
   .st-key-upl [data-testid="stFileUploaderDropzone"],
   .st-key-upl [data-testid="stFileUploaderFile"] {
-      height:25px !important;
-      min-height:25px !important;
-      max-height:25px !important;
+      height:26px !important;
+      min-height:26px !important;
+      max-height:26px !important;
       box-sizing:border-box !important;
       background:#1e293b !important;
       border:1px solid #334155 !important;
@@ -752,13 +762,13 @@ PAGE_CSS = """
       margin:0 !important;
   }
   .st-key-upl [data-testid="stFileUploaderDropzone"] {
-      padding:0 5px !important;
+      padding:0 6px !important;
       display:flex !important;
       align-items:center !important;
   }
   .st-key-upl [data-testid="stFileUploaderDropzone"] section {
-      height:23px !important;
-      min-height:23px !important;
+      height:24px !important;
+      min-height:24px !important;
       padding:0 !important;
       margin:0 !important;
       display:flex !important;
@@ -766,17 +776,15 @@ PAGE_CSS = """
   }
   .st-key-upl [data-testid="stFileUploaderDropzoneInstructions"] {
       display:none !important;
-      padding:0 !important;
-      margin:0 !important;
   }
   .st-key-upl [data-testid="stFileUploaderDropzone"] button {
-      height:21px !important;
-      min-height:21px !important;
-      max-height:21px !important;
-      padding:0 6px !important;
+      height:22px !important;
+      min-height:22px !important;
+      max-height:22px !important;
+      padding:0 7px !important;
       margin:0 !important;
       font-size:8px !important;
-      line-height:19px !important;
+      line-height:20px !important;
   }
   .st-key-upl [data-testid="stFileUploaderDropzone"] small,
   .st-key-upl [data-testid="stFileUploaderDropzone"] span {
@@ -788,7 +796,7 @@ PAGE_CSS = """
       display:none !important;
   }
   .st-key-upl [data-testid="stFileUploaderFile"] {
-      padding:0 5px !important;
+      padding:0 6px !important;
       display:flex !important;
       align-items:center !important;
   }
@@ -801,25 +809,25 @@ PAGE_CSS = """
 
   /* ---------------- SIGNUM INPUT ---------------- */
   .st-key-upl [data-testid="stTextInput"] {
-      height:25px !important;
-      min-height:25px !important;
-      max-height:25px !important;
+      height:26px !important;
+      min-height:26px !important;
+      max-height:26px !important;
       overflow:visible !important;
   }
   .st-key-upl [data-testid="stTextInput"] > div,
   .st-key-upl [data-testid="stTextInput"] > div > div {
-      height:25px !important;
-      min-height:25px !important;
-      max-height:25px !important;
+      height:26px !important;
+      min-height:26px !important;
+      max-height:26px !important;
       margin:0 !important;
       padding:0 !important;
       box-sizing:border-box !important;
   }
   .st-key-upl [data-testid="stTextInput"] div[data-baseweb="base-input"],
   .st-key-upl [data-testid="stTextInput"] div[data-baseweb="input"] {
-      height:25px !important;
-      min-height:25px !important;
-      max-height:25px !important;
+      height:26px !important;
+      min-height:26px !important;
+      max-height:26px !important;
       box-sizing:border-box !important;
       background:#1e293b !important;
       border:1px solid #334155 !important;
@@ -830,18 +838,18 @@ PAGE_CSS = """
   .st-key-upl [data-testid="stTextInput"] input {
       display:block !important;
       width:100% !important;
-      height:23px !important;
-      min-height:23px !important;
-      max-height:23px !important;
+      height:24px !important;
+      min-height:24px !important;
+      max-height:24px !important;
       box-sizing:border-box !important;
       color:#e2e8f0 !important;
       background:transparent !important;
       border:0 !important;
       outline:0 !important;
-      padding:0 6px !important;
+      padding:0 7px !important;
       margin:0 !important;
       font-size:9px !important;
-      line-height:21px !important;
+      line-height:22px !important;
   }
   .st-key-upl [data-testid="stTextInput"] input::placeholder {
       color:#94a3b8 !important;
@@ -850,26 +858,32 @@ PAGE_CSS = """
   .st-key-upl [data-testid="InputInstructions"] { display:none !important; }
 
   /* ---------------- GO BUTTON ----------------
-     Requested compact rectangular button, approximately 6 x 2 cm.
-     CSS uses cm so its physical intent is explicit; max-height keeps
-     the top bar from growing beyond the compact row.
-     */
+     Exact target: 6 cm wide x 2 cm high.
+     It is centered in its dedicated column and no longer stretches.
+  */
   .st-key-upl [data-testid="stButton"] {
-      height:25px !important;
-      min-height:25px !important;
-      max-height:25px !important;
+      height:2cm !important;
+      min-height:2cm !important;
+      max-height:2cm !important;
+      margin:0 !important;
+      padding:0 !important;
+      display:flex !important;
+      align-items:flex-end !important;
+      justify-content:center !important;
   }
   .st-key-upl div.stButton > button {
       width:6cm !important;
-      height:25px !important;
-      min-height:25px !important;
-      max-height:25px !important;
+      min-width:6cm !important;
+      max-width:6cm !important;
+      height:2cm !important;
+      min-height:2cm !important;
+      max-height:2cm !important;
       box-sizing:border-box !important;
       padding:0 10px !important;
       margin:0 auto !important;
       display:block !important;
-      font-size:9px !important;
-      line-height:23px !important;
+      font-size:10px !important;
+      line-height:normal !important;
       font-weight:600 !important;
       border-radius:3px !important;
   }
@@ -884,14 +898,14 @@ PAGE_CSS = """
       border:1px solid #334155 !important;
   }
 
-  /* Status text */
+  /* Status: same baseline as the control strip */
   .st-key-upl .stat-line {
-      height:25px !important;
-      line-height:25px !important;
+      height:26px !important;
+      line-height:26px !important;
       font-size:8px !important;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
+      white-space:nowrap !important;
+      overflow:hidden !important;
+      text-overflow:ellipsis !important;
       margin:0 !important;
       padding:0 !important;
   }
@@ -952,7 +966,7 @@ def main():
     except TypeError:
         bar = st.container()
     with bar:
-        c1, c2, c3, c4, c5 = cols([3.2, 3.2, 2.0, 1.6, 2.8])
+        c1, c2, c3, c4, c5 = cols([3.2, 3.2, 2.0, 2.0, 2.4])
         with c1:
             site_file = st.file_uploader("Site data (CSV)", type=["csv"], key="site")
         with c2:
