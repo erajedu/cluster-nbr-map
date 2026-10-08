@@ -20,8 +20,8 @@ import streamlit.components.v1 as components
 
 # ───────────────────────── CONFIG ─────────────────────────
 APP_TITLE = "Cluster Neighbor Visualization Tool"
-SUPPORT_NAME = "@Rajesh Dubey"
-SUPPORT_EMAIL = "rajesh.dubey@sds.com"
+SUPPORT_NAME = "@ Rajesh Dubey"
+SUPPORT_EMAIL = "rajesh.dubey@ericsson.com"
 
 MAX_DISTANCE_MILES, BUFFER_MILES, CLOSEST_N, ZERO_HO_IS_MISSING, WEDGE_RADIUS_M = 25.0, 1.8, 15, False, 400
 USID_COL, SITE_NAME_COL, LAT_COL, LON_COL, AZIMUTH_COL, CELL_COL = "USID", "ENODEB_New", "LATITUDE", "LONGITUDE", "AZIMUTH", "CELL"
