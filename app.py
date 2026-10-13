@@ -20,7 +20,7 @@ import streamlit.components.v1 as components
 
 # ───────────────────────── CONFIG ─────────────────────────
 APP_TITLE = "Cluster Neighbor Visualization Tool"
-SUPPORT_NAME = "Version=V1.3 Developer = Rajesh Dubey"
+SUPPORT_NAME = "version=V1.3 developer-Rajesh Dubey"
 SUPPORT_EMAIL = "rajesh.dubey@ericsson.com"
 
 MAX_DISTANCE_MILES, BUFFER_MILES, CLOSEST_N, ZERO_HO_IS_MISSING, WEDGE_RADIUS_M = 25.0, 1.8, 15, False, 400
@@ -843,7 +843,7 @@ def main():
             '<div style="font-size:12px;line-height:1.7">1. <b>Site data</b> (CSV): USID, coordinates, azimuth, cell<br>2. <b>SQL table</b> (Excel / CSV): neighbour relations and HO data</div></div></div>',
             unsafe_allow_html=True)
 
-    st.markdown(f'<div class="app-ftr">{SUPPORT_NAME} For any support, please connect with <a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="app-ftr">{SUPPORT_NAME} .For any support, please connect with <a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a></div>', unsafe_allow_html=True)
 
 
 main()
