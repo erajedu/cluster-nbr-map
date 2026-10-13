@@ -672,46 +672,70 @@ PAGE_CSS = """
   .block-container { padding:0 !important; max-width:100% !important; }
   div[data-testid="stVerticalBlock"] { gap:0 !important; }
   .element-container { margin-bottom:0 !important; }
+  [data-testid="stElementContainer"]:has(.app-hdr), [data-testid="stElementContainer"]:has(.app-hdr) [data-testid="stMarkdown"] { height:64px !important; min-height:64px !important; }
 
-  /* ── header banner: title on the left, input bar floats over the right side ── */
+  /* ── header banner: title on the left, compact input bar floats over the right side ── */
   .app-hdr { position:relative; background:linear-gradient(90deg,#08142e 0%,#0e2655 50%,#143a80 100%); color:#fff; font-size:17pt; font-weight:600; letter-spacing:.3px;
-             padding:0 22px; height:60px; box-sizing:border-box; display:flex; align-items:center; border-bottom:2px solid #3b82f6;
+             padding:0 22px; height:64px; box-sizing:border-box; display:flex; align-items:center; border-bottom:2px solid #3b82f6;
              white-space:nowrap; box-shadow:0 2px 12px rgba(0,0,0,.5); }
   .app-hdr .ttl::before { content:""; display:inline-block; width:4px; height:22px; background:#3b82f6; border-radius:2px; margin-right:12px; vertical-align:-4px; }
 
-  /* input bar = fixed layer over the banner (right side), same height as the banner */
-  .st-key-upl { position:fixed !important; top:0; right:0; height:58px; width:min(calc(100vw - 520px), 980px); z-index:1000;
-                display:flex !important; flex-direction:column; justify-content:center; padding:0 18px 0 0; background:transparent; }
-  .st-key-upl [data-testid="stHorizontalBlock"] { width:100%; gap:8px !important; align-items:flex-end; }
-  label[data-testid="stWidgetLabel"] { min-height:0 !important; margin:0 0 2px 0 !important; }
-  label[data-testid="stWidgetLabel"] p { font-size:8px !important; color:#a9bddb !important; margin:0 !important; font-weight:600; text-transform:uppercase; letter-spacing:.5px; line-height:9px !important; }
-  [data-testid="stFileUploader"], [data-testid="stTextInput"] { margin:0 !important; }
-  [data-testid="stFileUploader"] { height:28px !important; min-height:28px !important; overflow:hidden !important; margin:0 !important; }
-  [data-testid="stFileUploaderDropzone"], [data-testid="stFileUploaderFile"], [data-testid="stTextInput"] input, [data-testid="stTextInput"] div[data-baseweb="input"] {
-      min-height:28px !important; height:28px !important; box-sizing:border-box; background:rgba(6,14,36,.62) !important; border:1px solid rgba(148,163,184,.38) !important; border-radius:4px !important; }
-  [data-testid="stFileUploaderDropzone"]:hover, [data-testid="stTextInput"] div[data-baseweb="input"]:focus-within { border-color:#60a5fa !important; }
-  [data-testid="stFileUploaderDropzone"] { padding:0 6px !important; }
+  /* input bar = fixed layer over the banner (right side); every field is "LABEL [ box ]" on one line, all boxes 22px high */
+  .st-key-upl { position:fixed !important; top:0; right:0; height:62px; width:min(calc(100vw - 520px), 860px); z-index:1000;
+                display:flex !important; flex-direction:column; justify-content:center; gap:3px !important; padding:0 24px 0 0; background:transparent; }
+  .st-key-upl [data-testid="stHorizontalBlock"] { width:100%; gap:10px !important; align-items:center; }
+  .st-key-upl [data-testid="stColumn"], .st-key-upl [data-testid="stElementContainer"] { min-width:0; }
+  [data-testid="stTextInput"], [data-testid="stFileUploader"] { display:flex !important; flex-direction:row !important; align-items:center !important; gap:6px !important;
+      height:22px !important; min-height:22px !important; margin:0 !important; overflow:visible !important; }
+  [data-testid="stWidgetLabel"] { flex:0 0 70px !important; width:70px !important; min-height:0 !important; margin:0 !important; }
+  [data-testid="stWidgetLabel"] p { font-size:8px !important; color:#b8c9e6 !important; margin:0 !important; font-weight:600; text-transform:uppercase; letter-spacing:.4px; line-height:10px !important; white-space:nowrap; }
+  /* the three boxes: identical look and size */
+  [data-testid="stFileUploaderDropzone"], [data-testid="stFileUploaderFile"], [data-testid="stTextInputRootElement"], [data-testid="stTextInput"] div[data-baseweb="input"], [data-testid="stTextInput"] div[data-baseweb="base-input"] {
+      flex:1 1 auto; min-width:0; min-height:22px !important; height:22px !important; box-sizing:border-box; background:rgba(6,14,36,.62) !important;
+      border:1px solid rgba(148,163,184,.38) !important; border-radius:4px !important; box-shadow:none !important; }
+  [data-testid="stTextInput"] div[data-baseweb="base-input"] { border:0 !important; background:transparent !important; }
+  [data-testid="stTextInputRootElement"] { display:flex; align-items:center; }
+  [data-testid="stTextInput"] div[data-baseweb="base-input"] { height:20px !important; min-height:20px !important; }
+  [data-testid="stFileUploaderDropzone"]:hover, [data-testid="stTextInputRootElement"]:focus-within, [data-testid="stTextInput"] div[data-baseweb="input"]:focus-within { border-color:#60a5fa !important; }
+  [data-testid="stFileUploader"] > div:not([data-testid="stWidgetLabel"]), [data-testid="stTextInput"] > div:not([data-testid="stWidgetLabel"]) { flex:1 1 auto; min-width:0; height:22px; }
+  [data-testid="stFileUploaderDropzone"] { padding:0 3px !important; display:flex; align-items:center; }
   [data-testid="stFileUploaderDropzoneInstructions"] { display:none !important; }
   [data-testid="stFileUploaderDropzone"] small, [data-testid="stFileUploaderDropzone"] span { color:#b6c5de !important; font-size:9px !important; }
-  [data-testid="stFileUploaderDropzone"] button { min-height:20px !important; height:20px !important; padding:0 9px !important; font-size:9px !important; font-weight:600;
+  [data-testid="stFileUploaderDropzone"] button { min-height:16px !important; height:16px !important; padding:0 8px !important; font-size:9px !important; font-weight:600; line-height:16px !important;
       background:#2563eb !important; color:#fff !important; border:0 !important; border-radius:3px !important; }
   [data-testid="stFileUploader"]:has([data-testid="stFileUploaderFile"]) [data-testid="stFileUploaderDropzone"] { display:none !important; }   /* once a file is attached: show only the file row */
-  [data-testid="stFileUploaderFile"] { padding:0 6px !important; margin:0 !important; display:flex; align-items:center; height:28px !important; min-height:28px !important; }
-  [data-testid="stFileUploaderFile"] * { color:#e2e8f0 !important; font-size:9px !important; }
+  [data-testid="stFileUploaderDropzone"] button *, [data-testid="stFileUploaderDropzone"] button p { font-size:9px !important; line-height:16px !important; color:#fff !important; }
+  /* attached file (newer Streamlit "file chip" inside the dropzone): one slim line, name + x, no icon / size / "+" */
+  [data-testid="stFileUploaderDropzone"] { overflow:hidden !important; }
+  [data-testid="stFileUploaderDropzone"] > div:has([data-testid="stFileChips"]) { width:100%; min-width:0; }
+  [data-testid="stFileChips"], [data-testid="stFileChips"] > div, [data-testid="stFileChips"] > div > div { height:20px !important; min-height:0 !important; width:100%; margin:0 !important; padding:0 !important; }
+  [data-testid="stFileChip"] { display:flex !important; align-items:center; gap:6px; height:20px !important; min-height:0 !important; padding:0 4px !important; margin:0 !important; background:transparent !important; border:0 !important; box-shadow:none !important; width:100%; box-sizing:border-box; }
+  [data-testid="stFileChip"] > div:first-child { display:none !important; }
+  [data-testid="stFileChip"] > div:nth-child(2) { flex:1 1 auto; min-width:0; height:auto !important; overflow:hidden; display:flex; align-items:center; justify-content:flex-start; text-align:left; }
+  [data-testid="stFileChip"] > div:nth-child(2) > :not(:first-child) { display:none !important; }
+  [data-testid="stFileChip"] * { color:#e2e8f0 !important; font-size:9px !important; line-height:12px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  [data-testid="stFileChipDeleteBtn"] { flex:0 0 auto; height:16px !important; width:auto !important; display:flex; align-items:center; overflow:visible !important; }
+  [data-testid="stFileChipDeleteBtn"] button { min-height:14px !important; height:14px !important; width:14px !important; padding:0 !important; background:transparent !important; }
+  [data-testid="stFileChipDeleteBtn"] svg, [data-testid="stFileChipDeleteBtn"] span { width:12px !important; height:12px !important; }
+  [data-testid="stFileUploader"] button[data-testid="stBaseButton-borderlessIcon"] { display:none !important; }
+  [data-testid="stFileUploaderFile"] { padding:0 4px !important; margin:0 !important; display:flex; align-items:center; }
+  [data-testid="stFileUploaderFile"] * { color:#e2e8f0 !important; font-size:9px !important; line-height:12px !important; }
   [data-testid="stFileUploaderFile"] small { display:none !important; }
-  [data-testid="stTextInput"] input { color:#e2e8f0 !important; font-size:10px !important; padding:0 8px !important; height:26px !important; min-height:26px !important; }
+  [data-testid="stFileUploaderFile"] svg { width:12px !important; height:12px !important; }
+  [data-testid="stFileUploaderFile"] button { min-height:14px !important; height:14px !important; padding:0 2px !important; }
+  [data-testid="stTextInput"] input { color:#e2e8f0 !important; font-size:10px !important; padding:0 8px !important; height:20px !important; min-height:20px !important; background:transparent !important; }
   [data-testid="stTextInput"] input::placeholder { color:#8ea3c4 !important; opacity:1 !important; }
   [data-testid="InputInstructions"] { display:none !important; }
-  div.stButton > button { height:28px !important; min-height:28px !important; font-weight:600; border-radius:4px; padding:0 10px !important; font-size:10px !important; letter-spacing:.3px; }
+  div.stButton > button { height:22px !important; min-height:22px !important; font-weight:600; border-radius:4px; padding:0 10px !important; font-size:10px !important; letter-spacing:.3px; line-height:20px !important; }
   div.stButton > button[kind="primary"] { background:linear-gradient(180deg,#3b82f6,#2563eb); border:1px solid #60a5fa; color:#fff; box-shadow:0 1px 6px rgba(37,99,235,.55); }
   div.stButton > button[kind="primary"]:hover { background:linear-gradient(180deg,#4b8ff7,#2f6df0); }
   div.stButton > button:disabled { background:rgba(6,14,36,.62) !important; color:#6f819f !important; border:1px solid rgba(148,163,184,.3) !important; box-shadow:none !important; }
-  .stat-line { font-size:9px; line-height:28px; height:28px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .stat-line { font-size:9px; line-height:12px; height:12px; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
   /* map frame fills the space between the banner and the footer */
-  .stApp iframe { height:calc(100vh - 96px); width:100%; border:0; display:block; }
-  .landing { height:calc(100vh - 96px); display:flex; align-items:center; justify-content:center; color:#64748b; text-align:center; }
-  @media (max-width:1100px) { .app-hdr { font-size:13pt; } .st-key-upl { width:calc(100vw - 360px); } }
+  .stApp iframe { height:calc(100vh - 90px); width:100%; border:0; display:block; }
+  .landing { height:calc(100vh - 90px); display:flex; align-items:center; justify-content:center; color:#64748b; text-align:center; }
+  @media (max-width:1100px) { .app-hdr { font-size:13pt; } .st-key-upl { width:calc(100vw - 380px); } }
 
   /* footer (always on the bottom line) */
   .app-ftr { position:fixed; left:0; right:0; bottom:0; height:26px; background:#0d1220; border-top:1px solid #1e293b; color:#cbd5e1; font-size:11px;
@@ -760,18 +784,18 @@ def main():
 
     bar = st.container(key="upl")
     with bar:
-        c1, c2, c3, c4, c5 = cols([3.0, 3.0, 2.0, 0.9, 2.4])
+        c1, c2, c3, c4 = cols([1.0, 1.0, 1.0, 0.3])
         with c1:
             site_file = st.file_uploader("Site data (CSV)", type=["csv"], key="site")
         with c2:
-            nbr_file = st.file_uploader("SQL table (XLSX / CSV)", type=["xlsx", "xls", "csv"], key="nbr")
+            nbr_file = st.file_uploader("SQL table", type=["xlsx", "xls", "csv"], key="nbr")
         with c3:
             st.text_input("SIGNUM ID", key="u_id", placeholder="Enter SIGNUM ID", max_chars=20)
         signum = clean_signum(st.session_state.u_id)
         ready = bool(site_file and nbr_file and signum)          # nothing loads unless ALL THREE inputs are valid
         with c4:
             go = st.button("▶ Go", type="primary", disabled=not ready, use_container_width=True, key="go")
-        status = c5.empty()
+        status = st.empty()
 
     cur_sig = (sig(site_file), sig(nbr_file))
 
