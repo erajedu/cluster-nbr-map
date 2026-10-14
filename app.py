@@ -779,7 +779,7 @@ def main():
     st.markdown(PAGE_CSS, unsafe_allow_html=True)
     st.markdown(f'<div class="app-hdr"><span class="ttl">{APP_TITLE}</span></div>', unsafe_allow_html=True)
 
-    log_url, log_token = secret("LOG_WEBHOOK_URL"), secret("LOG_TOKEN")
+    log_url, log_token = secret("https://script.google.com/macros/s/AKfycbz9XMMl73c-A90Cpe6n5eyvZsGDKyADLBOJ1ZMtuH5Rs1jOe6Jy-vCHzC_d7lsYyQw5/exec"), secret("k8Jd2Lx9QwPz7TnVb4123456")
     st.session_state.setdefault("u_id", "")
 
     bar = st.container(key="upl")
