@@ -21,7 +21,7 @@ import streamlit.components.v1 as components
 
 # ───────────────────────── CONFIG ─────────────────────────
 APP_TITLE = "Cluster Neighbor Visualization Tool"
-SUPPORT_NAME = "version=V1.4 developer-Rajesh Dubey"
+SUPPORT_NAME = "version=V1.3 developer-Rajesh Dubey"
 SUPPORT_EMAIL = "rajesh.dubey@ericsson.com"
 
 MAX_DISTANCE_MILES, BUFFER_MILES, CLOSEST_N, ZERO_HO_IS_MISSING, WEDGE_RADIUS_M = 25.0, 1.8, 15, False, 400
@@ -805,7 +805,7 @@ PAGE_CSS = """
 
   /* map frame fills the space between the banner and the footer */
   .stApp iframe { height:calc(100vh - 90px); width:100%; border:0; display:block; }
-  .landing { height:calc(100vh - 90px); display:flex; align-items:center; justify-content:center; color:#64748b; text-align:center; }
+  .landing { height:auto; min-height:0; display:block; color:#64748b; text-align:left; }
   @media (max-width:1100px) { .app-hdr { font-size:13pt; } .st-key-upl { width:calc(100vw - 380px); } }
 
   /* footer (always on the bottom line) */
@@ -914,9 +914,12 @@ def main():
         guide_path = Path(__file__).with_name("input_guide.html")
         if guide_path.exists():
             guide_html = guide_path.read_text(encoding="utf-8")
+            # Flatten line breaks/indentation before passing the fragment to Streamlit Markdown.
+            # Indented HTML lines can be interpreted as a Markdown code block and shown literally.
+            guide_html = "".join(line.strip() for line in guide_html.splitlines() if line.strip())
             st.markdown(
-                '<div class="landing" style="overflow-y:auto;align-items:flex-start;'
-                'padding:24px 20px 36px;box-sizing:border-box;">'
+                '<div class="landing" style="width:100%;height:auto;min-height:0;display:block;'
+                'padding:18px 12px 36px;box-sizing:border-box;overflow:visible;">'
                 + guide_html + '</div>',
                 unsafe_allow_html=True,
             )
