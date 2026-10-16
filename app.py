@@ -290,7 +290,7 @@ input[type="color"]{width:32px;height:24px;border:1px solid #334155;border-radiu
 #toast{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#10b981;color:#fff;padding:8px 16px;border-radius:5px;z-index:1000;display:none;font-weight:500;font-size:12px;box-shadow:0 4px 12px rgba(0,0,0,0.4)}
 
 .lbl{font-weight:600;font-size:var(--fs);white-space:nowrap;text-shadow:1px 1px 3px #000,-1px -1px 3px #000,1px -1px 3px #000,-1px 1px 3px #000}
-.lbl-source{font-size:calc(var(--fs) + 2px)}.lbl-other{display:none}.zhi .lbl-other{display:block}.nolbl .lbl{display:none!important}.allblue .lbl-ok,.allblue .lbl-missing,.allblue .lbl-other{color:#3b82f6!important}
+.lbl-source{font-size:calc(var(--fs) + 2px)}.lbl-other{display:block}.nolbl .lbl{display:none!important}.allblue .lbl-ok,.allblue .lbl-missing,.allblue .lbl-other{color:#3b82f6!important}
 
 .vh{width:10px;height:10px;background:#fff;border:2px solid #60a5fa;border-radius:50%;cursor:move}
 .crosshair,.crosshair.leaflet-grab{cursor:crosshair!important}
