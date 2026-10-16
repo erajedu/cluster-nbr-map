@@ -12,6 +12,7 @@ import json
 import math
 import os
 import re
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -20,7 +21,7 @@ import streamlit.components.v1 as components
 
 # ───────────────────────── CONFIG ─────────────────────────
 APP_TITLE = "Cluster Neighbor Visualization Tool"
-SUPPORT_NAME = "version=V1.3 developer-Rajesh Dubey"
+SUPPORT_NAME = "version=V1.4 developer-Rajesh Dubey"
 SUPPORT_EMAIL = "rajesh.dubey@ericsson.com"
 
 MAX_DISTANCE_MILES, BUFFER_MILES, CLOSEST_N, ZERO_HO_IS_MISSING, WEDGE_RADIUS_M = 25.0, 1.8, 15, False, 400
@@ -84,6 +85,61 @@ def read_upload(f):
     df = pd.read_csv(raw, low_memory=False) if f.name.lower().endswith(".csv") else pd.read_excel(raw)
     df.columns = df.columns.astype(str).str.strip()
     return df
+
+
+def normalize_column_key(name):
+    """Normalize a column header for conservative alias matching."""
+    return re.sub(r"[^a-z0-9]", "", str(name).strip().lower())
+
+
+def normalize_columns(df, aliases, label):
+    """Rename known header aliases to the canonical column names used by the app."""
+    df = df.copy()
+    by_key = {}
+    for col in df.columns:
+        by_key.setdefault(normalize_column_key(col), []).append(col)
+
+    rename_map = {}
+    for canonical, accepted_names in aliases.items():
+        keys = {normalize_column_key(canonical)}
+        keys.update(normalize_column_key(name) for name in accepted_names)
+        matches = list(dict.fromkeys(
+            col for key in keys for col in by_key.get(key, [])
+        ))
+        if len(matches) > 1:
+            raise ValueError(
+                f"{label}: multiple columns match '{canonical}': {matches}. "
+                "Keep only one of these columns."
+            )
+        if matches and matches[0] != canonical:
+            rename_map[matches[0]] = canonical
+
+    df = df.rename(columns=rename_map)
+    duplicates = df.columns[df.columns.duplicated()].tolist()
+    if duplicates:
+        raise ValueError(
+            f"{label}: duplicate columns after header normalization: {duplicates}"
+        )
+    return df
+
+
+# Keep these aliases conservative. Add a new alias only when it represents the same field.
+SITE_ALIASES = {
+    "USID": ["US Id", "Site USID", "Node USID", "Node_USID"],
+    "ENODEB_New": ["ENODEB", "eNodeB", "Node_Name", "Node Name", "Site Name", "Site_Name", "eNodeB Name", "ENODEB Name", "NodeName"],
+    "LATITUDE": ["Latitude", "LAT", "Lat", "Latitude (deg)"],
+    "LONGITUDE": ["Longitude", "LON", "LONG", "Lon", "Longitude (deg)"],
+    "AZIMUTH": ["Azimuth", "AZI", "Bearing", "Sector Azimuth"],
+    "CELL": ["Cell Name", "Cell_Name", "Cell ID", "Cell_ID"],
+}
+
+NBR_ALIASES = {
+    "USID": ["Source USID", "Source_USID", "Source Node USID", "Source Node ID"],
+    "ClusterUSID": ["Cluster USID", "Cluster_USID", "Neighbour USID", "Neighbor USID", "Neighbour ID", "Neighbor ID", "NBR USID"],
+    "ClusterName": ["Cluster Name", "Cluster_Name"],
+    "HO ATT": ["HO_ATT", "HO Attempts", "Handover Attempts", "HO Attempt"],
+    "% Sharing": ["Sharing", "Sharing %", "Percent Sharing", "Pct Sharing", "Pct_Sharing"],
+}
 
 
 def load_sites(df):
@@ -306,6 +362,11 @@ input[type="color"]{width:32px;height:24px;border:1px solid #334155;border-radiu
     <div id="inside"></div>
 
     <div class="section-title">VIEW CONTROLS</div>
+    <div class="ctrl-label">Site label</div>
+    <select id="labelMode" title="Choose the label shown for each site">
+      <option value="name" selected>ENODEB / Site Name</option>
+      <option value="usid">USID</option>
+    </select>
     <div class="ctrl-label">Sector: <b id="sVal">1.0</b> x</div>
     <input type="range" id="ss" min="0.5" max="6" step="0.1" value="1">
     <div class="ctrl-label">Font: <b id="fVal">13</b> px</div>
@@ -377,6 +438,12 @@ const D = __DATA__;
 const S = D.sites, CFG = D.cfg, ALL = Object.keys(S);
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let labelMode = 'name';
+function displayName(u) {
+  if (labelMode === 'usid') return String(u);
+  const name = S[u] && S[u][0] != null ? String(S[u][0]).trim() : '';
+  return name || String(u);
+}
 const COL = {source:'#f97316', ok:'#3b82f6', missing:'#f59e0b', other:'#6b7280'};
 const TXT = {source:'#f97316', ok:'#3b82f6', missing:'#f59e0b', other:'#9ca3af'};
 const STAT = {ok:['Defined','#10b981'], zero_ho:['0% HO','#f59e0b'], no_coords:['Not in file','#ef4444'], not_defined:['Suggested','#8b5cf6']};
@@ -441,6 +508,10 @@ function setLayer(g, on) { on ? map.addLayer(g) : map.removeLayer(g); }
 function applyVis() { setLayer(G.other, $('vOther').checked); setLayer(G.missing, $('vMiss').checked); setLayer(LG.ok, $('vLines').checked); setLayer(LG.missing, $('vLines').checked && $('vMiss').checked); mapEl.classList.toggle('nolbl', !$('vLbl').checked); }
 ['vLines','vMiss','vOther','vLbl'].forEach(id => $(id).addEventListener('change', applyVis));
 $('vBlue').addEventListener('change', recolor);
+$('labelMode').addEventListener('change', e => {
+  labelMode = e.target.value;
+  if (cur && cur.src) loadSource(cur.src, '');
+});
 
 function wedge(lat, lon, az, r) {
   const la = lat*Math.PI/180, lo = lon*Math.PI/180, d = r/6371000, pts = [[lat, lon]];
@@ -466,7 +537,7 @@ function carvePolygon(poly, targets, members, W, M) { let done = 0, skipped = 0;
 let cur = null, wedges = [], dots = [], siteLayers = {}, radius = CFG.radiusM, incl = {}, polyPts = [], dirty = false, handles = [], lastBuf = CFG.buffer, filter = 'all';
 const poly = L.polygon([], {pane:'poly', color:'#3b82f6', weight:3, fill:false, bubblingMouseEvents:false}).addTo(map);
 
-function tip(u, extra) { const s = S[u], n = cur && cur.NB[u]; let h = '<b>' + esc(s[0]) + '</b><br>USID: ' + esc(u); if (cur && u === cur.src) h += '<br><span style="color:#f97316">SOURCE</span>'; else if (n) { h += '<br>' + STAT[n.st][0]; if (n.pct != null) h += ' · HO ' + n.pct.toFixed(1) + '%'; if (n.d != null) h += ' · ' + n.d + ' mi'; } return h + (extra || ''); }
+function tip(u, extra) { const s = S[u], n = cur && cur.NB[u]; let h = '<b>' + esc(displayName(u)) + '</b><br>USID: ' + esc(u); if (cur && u === cur.src) h += '<br><span style="color:#f97316">SOURCE</span>'; else if (n) { h += '<br>' + STAT[n.st][0]; if (n.pct != null) h += ' · HO ' + n.pct.toFixed(1) + '%'; if (n.d != null) h += ' · ' + n.d + ' mi'; } return h + (extra || ''); }
 const popup = (u, extra) => tip(u, extra) + '<br><a href="#" onclick="loadSource(\'' + String(u).replace(/'/g, '') + '\',\'map\');return false" style="color:#60a5fa">Load as source</a>';
 
 function loadSource(u, via) {
@@ -487,14 +558,14 @@ function loadSource(u, via) {
         p.on('click', onClick); sl.wedges.push(p); g.addLayer(p); wedges.push({p, s, az:c[1], role});
       });
       if (!s[3].length) { const dot = L.circleMarker([s[1], s[2]], {radius:5, color:'#000', weight:1, fillColor:COL[role], fillOpacity:.9}).bindTooltip(tip(k)).bindPopup(popup(k)); dot.on('click', onClick); sl.dot = dot; g.addLayer(dot); dots.push({m:dot, role}); }
-      g.addLayer(L.marker([s[1], s[2]], {interactive:false, icon:L.divIcon({className:'', iconSize:[150, 20], iconAnchor:[-8, 10], html:'<div class="lbl lbl-' + role + '" style="color:' + TXT[role] + '">' + esc(s[0]) + '</div>'})}));
+      g.addLayer(L.marker([s[1], s[2]], {interactive:false, icon:L.divIcon({className:'', iconSize:[150, 20], iconAnchor:[-8, 10], html:'<div class="lbl lbl-' + role + '" style="color:' + TXT[role] + '">' + esc(displayName(k)) + '</div>'})}));
     });
   });
   A.nbrs.forEach(n => { if (!S[n.u]) return; const miss = n.st !== 'ok', s = S[n.u]; L.polyline([[src[1], src[2]], [s[1], s[2]]], miss ? {color:'#f59e0b', weight:1.8, dashArray:'6,5', opacity:.85, interactive:false} : {color:'#10b981', weight:1.8, opacity:.75, interactive:false}).addTo(miss ? LG.missing : LG.ok); });
   applyVis(); recolor(); selected.forEach(styleSel);
   incl = {}; incl[u] = true; A.nbrs.forEach(n => { if (S[n.u]) incl[n.u] = (n.st === 'ok'); });
   $('empty').style.display = 'none'; $('panel').style.display = ''; $('q').value = u;
-  $('tSrc').textContent = 'Source: ' + u + ' (' + src[0] + ')';
+  $('tSrc').textContent = 'Source: ' + u + ' (' + displayName(u) + ')';
   $('tSub').textContent = A.cluster || (D.nbr[u] ? '' : 'No neighbour definition in SQL table for this USID');
   $('tInfo').textContent = src[1].toFixed(5) + ', ' + src[2].toFixed(5) + ' | ' + src[3].length + ' cell(s)';
   const c = st => A.nbrs.filter(n => n.st === st).length;
@@ -534,7 +605,7 @@ $('btnFit').addEventListener('click', fit); $('tg').addEventListener('click', ()
 
 const PILLS = [['all', 'All'], ['ok', 'Defined OK'], ['miss', 'Missing / suggested']];
 function renderPills() { $('pills').innerHTML = PILLS.map(p => '<button data-f="' + p[0] + '" class="' + (filter === p[0] ? 'on' : '') + '">' + p[1] + '</button>').join(''); }
-function renderList() { const rows = cur.nbrs.filter(n => filter === 'all' || (filter === 'ok' && n.st === 'ok') || (filter === 'miss' && n.st !== 'ok')); $('list').innerHTML = rows.length ? rows.map(n => { const has = !!S[n.u]; const meta = [n.ho != null ? (n.ho === 0 ? '<span style="color:#f59e0b">HO 0</span>' : 'HO ' + n.ho) : '', n.pct != null ? n.pct.toFixed(1) + '%' : '', n.d != null ? n.d + ' mi' : '', n.st === 'not_defined' ? 'not in SQL table' : ''].filter(Boolean).join(' · '); return '<div class="nb" data-u="' + esc(n.u) + '"><div class="nbt">' + (has ? '<input type="checkbox" class="inc" data-u="' + esc(n.u) + '"' + (incl[n.u] ? ' checked' : '') + '>' : '<span style="width:13px"></span>') + '<b>' + esc(n.u) + '</b><span class="nm">' + esc(n.n) + '</span><span class="bd" style="background:' + STAT[n.st][1] + '">' + STAT[n.st][0] + '</span></div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>'; }).join('') : '<div class="hint">Nothing to show.</div>'; }
+function renderList() { const rows = cur.nbrs.filter(n => filter === 'all' || (filter === 'ok' && n.st === 'ok') || (filter === 'miss' && n.st !== 'ok')); $('list').innerHTML = rows.length ? rows.map(n => { const has = !!S[n.u]; const meta = [n.ho != null ? (n.ho === 0 ? '<span style="color:#f59e0b">HO 0</span>' : 'HO ' + n.ho) : '', n.pct != null ? n.pct.toFixed(1) + '%' : '', n.d != null ? n.d + ' mi' : '', n.st === 'not_defined' ? 'not in SQL table' : ''].filter(Boolean).join(' · '); return '<div class="nb" data-u="' + esc(n.u) + '"><div class="nbt">' + (has ? '<input type="checkbox" class="inc" data-u="' + esc(n.u) + '"' + (incl[n.u] ? ' checked' : '') + '>' : '<span style="width:13px"></span>') + '<b>' + esc(n.u) + '</b><span class="nm">' + esc(displayName(n.u)) + '</span><span class="bd" style="background:' + STAT[n.st][1] + '">' + STAT[n.st][0] + '</span></div>' + (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>'; }).join('') : '<div class="hint">Nothing to show.</div>'; }
 $('pills').addEventListener('click', e => { if (e.target.dataset.f) { filter = e.target.dataset.f; renderPills(); renderList(); } });
 $('list').addEventListener('change', e => { if (!e.target.classList.contains('inc')) return; const u = e.target.dataset.u; incl[u] = e.target.checked; if (!tryRebuild()) { e.target.checked = !e.target.checked; incl[u] = e.target.checked; } });
 $('list').addEventListener('click', e => { if (e.target.closest('.inc')) return; const row = e.target.closest('.nb'); if (!row) return; const s = S[row.dataset.u]; if (s) map.flyTo([s[1], s[2]], Math.max(map.getZoom(), 13)); else toast(row.dataset.u + ' has no coordinates in the site file'); });
@@ -546,7 +617,7 @@ $('btnCsvAll').addEventListener('click', () => { toast('Analysing all sources ..
 
 let acIdx = -1;
 function acHits(v) { v = v.trim().toUpperCase(); if (v.length < 2) return []; const starts = [], inc = []; for (const k of ALL) { const nm = String(S[k][0]).toUpperCase(); if (k === v || k.startsWith(v) || nm.startsWith(v)) starts.push(k); else if (k.includes(v) || nm.includes(v)) inc.push(k); if (starts.length >= 40) break; } return starts.concat(inc).slice(0, 40); }
-function renderAc() { const hits = acHits($('q').value), dd = $('ac'); acIdx = -1; if (!hits.length) { dd.style.display = 'none'; dd.innerHTML = ''; return; } dd.innerHTML = hits.map(k => '<div class="ai" data-u="' + esc(k) + '"><b>' + esc(k) + '</b><span>' + esc(S[k][0]) + '</span>' + (D.nbr[k] ? '<i style="color:#10b981;font-size:10px">✓ cluster</i>' : '') + '</div>').join(''); dd.style.display = 'block'; }
+function renderAc() { const hits = acHits($('q').value), dd = $('ac'); acIdx = -1; if (!hits.length) { dd.style.display = 'none'; dd.innerHTML = ''; return; } dd.innerHTML = hits.map(k => '<div class="ai" data-u="' + esc(k) + '"><b>' + esc(k) + '</b><span>' + esc(displayName(k)) + '</span>' + (D.nbr[k] ? '<i style="color:#10b981;font-size:10px">✓ cluster</i>' : '') + '</div>').join(''); dd.style.display = 'block'; }
 function pick(u) { $('ac').style.display = 'none'; loadSource(u, 'search'); }
 $('q').addEventListener('input', renderAc);
 $('q').addEventListener('keydown', e => { const items = $('ac').querySelectorAll('.ai'); if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (!items.length) return; e.preventDefault(); acIdx = Math.max(0, Math.min(items.length - 1, acIdx + (e.key === 'ArrowDown' ? 1 : -1))); items.forEach((el, i) => el.classList.toggle('sel', i === acIdx)); } else if (e.key === 'Enter') { e.preventDefault(); const v = $('q').value.trim().toUpperCase(); if (acIdx >= 0 && items[acIdx]) pick(items[acIdx].dataset.u); else if (S[v]) pick(v); else if (items.length) pick(items[0].dataset.u); } else if (e.key === 'Escape') $('ac').style.display = 'none'; });
@@ -808,8 +879,10 @@ def main():
         try:
             ph.markdown(overlay("Loading data ...", "Reading site file"), unsafe_allow_html=True)
             site_df = read_upload(site_file)
+            site_df = normalize_columns(site_df, SITE_ALIASES, "Site file")
             ph.markdown(overlay("Loading data ...", "Reading SQL table"), unsafe_allow_html=True)
             nbr_df = read_upload(nbr_file)
+            nbr_df = normalize_columns(nbr_df, NBR_ALIASES, "SQL table")
             ph.markdown(overlay("Loading data ...", "Building the map - this can take a few seconds"), unsafe_allow_html=True)
             payload = build_payload(site_df, nbr_df, user, log_url, log_token)
             st.session_state["map_html"] = render_html(payload)
@@ -838,11 +911,23 @@ def main():
     if "map_html" in st.session_state:
         show_map(st.session_state["map_html"])
     else:
-        st.markdown(
-            '<div class="landing"><div><div style="font-size:46px;margin-bottom:14px">📡</div>'
-            '<div style="font-size:18px;color:#94a3b8;margin-bottom:8px">Upload both files, enter your SIGNUM ID, then press <b style="color:#60a5fa">Go</b></div>'
-            '<div style="font-size:12px;line-height:1.7">1. <b>Site data</b> (CSV): USID, coordinates, azimuth, cell<br>2. <b>SQL table</b> (Excel / CSV): neighbour relations and HO data</div></div></div>',
-            unsafe_allow_html=True)
+        guide_path = Path(__file__).with_name("input_guide.html")
+        if guide_path.exists():
+            guide_html = guide_path.read_text(encoding="utf-8")
+            st.markdown(
+                '<div class="landing" style="overflow-y:auto;align-items:flex-start;'
+                'padding:24px 20px 36px;box-sizing:border-box;">'
+                + guide_html + '</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div class="landing"><div><div style="font-size:46px;margin-bottom:14px">📡</div>'
+                '<div style="font-size:18px;color:#94a3b8;margin-bottom:8px">Upload both files, enter your SIGNUM ID, then press <b style="color:#60a5fa">Go</b></div>'
+                '<div style="font-size:12px;line-height:1.7">1. <b>Site data</b> (CSV): USID, coordinates, azimuth, cell<br>2. <b>SQL table</b> (Excel / CSV): neighbour relations and HO data</div>'
+                '<div style="font-size:11px;color:#fbbf24;margin-top:12px">Optional input_guide.html was not found in the app folder.</div></div></div>',
+                unsafe_allow_html=True,
+            )
 
     st.markdown(f'<div class="app-ftr">{SUPPORT_NAME} .For any support, please connect with <a href="mailto:{SUPPORT_EMAIL}">{SUPPORT_EMAIL}</a></div>', unsafe_allow_html=True)
 
