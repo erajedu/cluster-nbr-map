@@ -1,0 +1,68 @@
+
+<div style="max-width:1050px;margin:auto;text-align:left;
+            background:#0d1220;border:1px solid #334155;
+            border-radius:8px;padding:18px 24px;color:#e2e8f0;
+            font-family:Segoe UI,Arial,sans-serif">
+
+  <h2 style="color:#60a5fa;margin:0 0 12px">
+    Input File Requirements & Instructions
+  </h2>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+
+    <div>
+      <h3 style="color:#93c5fd">1. Site Data CSV</h3>
+      <p>Upload a CSV containing site locations and sector information.</p>
+      <p><b>Required fields</b></p>
+      <ul>
+        <li><b>USID</b> — unique site/node identifier</li>
+        <li><b>LATITUDE</b> — numeric latitude</li>
+        <li><b>LONGITUDE</b> — numeric longitude</li>
+        <li><b>AZIMUTH</b> — sector direction in degrees</li>
+      </ul>
+      <p><b>Recommended fields</b></p>
+      <ul>
+        <li><b>ENODEB_New</b> — readable site/node name</li>
+        <li><b>CELL</b> — cell or sector name</li>
+      </ul>
+      <p style="color:#94a3b8;font-size:12px">
+        Site names and cell names are optional. USID, coordinates
+        and azimuth are required by the current processing logic.
+      </p>
+    </div>
+
+    <div>
+      <h3 style="color:#93c5fd">2. Neighbour SQL Table</h3>
+      <p>Upload the table containing configured neighbour relations.</p>
+      <p><b>Required fields</b></p>
+      <ul>
+        <li><b>USID</b> — source site identifier</li>
+        <li><b>ClusterUSID</b> — neighbour site identifier</li>
+      </ul>
+      <p><b>Optional fields</b></p>
+      <ul>
+        <li><b>ClusterName</b> — cluster name</li>
+        <li><b>HO ATT</b> — handover attempts/metric</li>
+        <li><b>% Sharing</b> — sharing percentage</li>
+      </ul>
+      <p style="color:#94a3b8;font-size:12px">
+        Accepted formats: XLSX, XLS or CSV. Optional columns are
+        used when present.
+      </p>
+    </div>
+  </div>
+
+  <div style="border-top:1px solid #334155;margin-top:12px;padding-top:12px">
+    <h3 style="color:#93c5fd;margin:0 0 8px">Before clicking Go</h3>
+    <ol>
+      <li>Check that both files contain the correct headers and data.</li>
+      <li>Ensure site IDs match between the two files.</li>
+      <li>Check that coordinates and azimuths contain valid numeric values.</li>
+      <li>Upload both files, enter your SIGNUM ID and click <b>Go</b>.</li>
+    </ol>
+    <p style="color:#fbbf24;font-size:12px">
+      Header aliases are accepted only when configured in the tool.
+      Missing required fields or ambiguous duplicate columns must be corrected.
+    </p>
+  </div>
+</div>
